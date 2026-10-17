@@ -1,0 +1,101 @@
+﻿description,categorie
+Une canalisation laisse couler de l’eau sur le trottoir depuis ce matin.,FUITE_EAU
+Il y a une fuite importante près du regard d’eau devant notre immeuble.,FUITE_EAU
+De l’eau jaillit du sol au milieu de la rue.,FUITE_EAU
+Un tuyau semble cassé et l’eau se répand dans la chaussée.,FUITE_EAU
+Nous observons une flaque qui grandit près d’une conduite municipale.,FUITE_EAU
+Une borne-fontaine fuit même lorsqu’elle est fermée.,FUITE_EAU
+De l’eau s’écoule continuellement autour du compteur extérieur.,FUITE_EAU
+La canalisation devant la maison est endommagée et perd de l’eau.,FUITE_EAU
+Une fuite est visible près du réservoir du quartier.,FUITE_EAU
+L’eau sort d’un raccord de tuyauterie et inonde le passage.,FUITE_EAU
+Un petit jet d’eau apparaît sur la route près du chantier.,FUITE_EAU
+Le couvercle du regard est entouré d’eau qui coule.,FUITE_EAU
+Une conduite souterraine semble fuir depuis plusieurs heures.,FUITE_EAU
+Il y a de l’eau partout autour de la vanne publique.,FUITE_EAU
+Une canalisation fuit à proximité de l’école.,FUITE_EAU
+Le tuyau d’alimentation est fissuré et laisse échapper de l’eau.,FUITE_EAU
+Un écoulement inhabituel vient d’une conduite dans la rue.,FUITE_EAU
+La fuite d’eau augmente près du carrefour principal.,FUITE_EAU
+De l’eau coule sous le trottoir à côté d’un bâtiment.,FUITE_EAU
+Une conduite semble rompue après les travaux de voirie.,FUITE_EAU
+Nous avons signalé de l’eau qui s’échappe près d’une vanne.,FUITE_EAU
+Le sol reste mouillé à cause d’une fuite probable de canalisation.,FUITE_EAU
+Une grosse fuite provoque une accumulation d’eau sur la chaussée.,FUITE_EAU
+Le raccord du réseau public goutte sans arrêt.,FUITE_EAU
+Une canalisation d’eau potable perd de l’eau près du marché.,FUITE_EAU
+L’eau du robinet a une odeur inhabituelle depuis hier.,CONTAMINATION_SUSPECTEE
+L’eau distribuée est devenue marron et trouble.,CONTAMINATION_SUSPECTEE
+Nous remarquons un goût étrange dans l’eau potable.,CONTAMINATION_SUSPECTEE
+L’eau contient des particules visibles dans le verre.,CONTAMINATION_SUSPECTEE
+Une odeur chimique se dégage de l’eau du robinet.,CONTAMINATION_SUSPECTEE
+L’eau est trouble dans plusieurs maisons de la rue.,CONTAMINATION_SUSPECTEE
+Des résidus inhabituels apparaissent dans l’eau distribuée.,CONTAMINATION_SUSPECTEE
+L’eau du robinet a changé de couleur brusquement.,CONTAMINATION_SUSPECTEE
+Nous suspectons une pollution de l’eau après un incident près du réservoir.,CONTAMINATION_SUSPECTEE
+L’eau potable présente une odeur de produit chimique.,CONTAMINATION_SUSPECTEE
+Un dépôt inhabituel est visible au fond d’une bouteille remplie au robinet.,CONTAMINATION_SUSPECTEE
+L’eau distribuée semble anormalement opaque.,CONTAMINATION_SUSPECTEE
+Plusieurs habitants signalent une odeur étrange dans l’eau.,CONTAMINATION_SUSPECTEE
+L’eau est jaunâtre depuis la remise en service du réseau.,CONTAMINATION_SUSPECTEE
+Nous avons observé des particules noires dans l’eau du robinet.,CONTAMINATION_SUSPECTEE
+L’eau a un goût métallique inhabituel.,CONTAMINATION_SUSPECTEE
+Une substance inconnue flotte dans l’eau du réservoir.,CONTAMINATION_SUSPECTEE
+L’eau du quartier dégage une mauvaise odeur.,CONTAMINATION_SUSPECTEE
+La couleur de l’eau a changé et elle paraît sale.,CONTAMINATION_SUSPECTEE
+Des habitants se plaignent de la qualité inhabituelle de l’eau.,CONTAMINATION_SUSPECTEE
+L’eau présente une mousse inhabituelle à la sortie du robinet.,CONTAMINATION_SUSPECTEE
+Une odeur de carburant est remarquée dans l’eau.,CONTAMINATION_SUSPECTEE
+L’eau semble contenir des dépôts après une intervention sur la conduite.,CONTAMINATION_SUSPECTEE
+L’eau du robinet est devenue blanchâtre et dégage une odeur étrange.,CONTAMINATION_SUSPECTEE
+Nous craignons une contamination après la découverte d’un produit près du puits.,CONTAMINATION_SUSPECTEE
+Il n’y a plus d’eau au robinet depuis ce matin.,COUPURE_EAU
+Tout le quartier est privé d’eau depuis deux heures.,COUPURE_EAU
+L’alimentation en eau est interrompue dans notre rue.,COUPURE_EAU
+Aucune eau ne sort des robinets de la maison.,COUPURE_EAU
+La distribution d’eau potable est coupée depuis hier soir.,COUPURE_EAU
+Nous subissons une coupure d’eau non annoncée.,COUPURE_EAU
+Plusieurs immeubles n’ont plus d’eau aujourd’hui.,COUPURE_EAU
+Le débit est nul dans tout le bâtiment depuis ce matin.,COUPURE_EAU
+L’eau ne revient toujours pas après l’heure annoncée.,COUPURE_EAU
+La rue entière est sans alimentation en eau.,COUPURE_EAU
+Il n’y a aucune pression et aucun débit au robinet.,COUPURE_EAU
+Une interruption de la distribution touche notre quartier.,COUPURE_EAU
+L’approvisionnement en eau est arrêté dans le secteur nord.,COUPURE_EAU
+Les habitants signalent une coupure totale du réseau.,COUPURE_EAU
+L’eau a été coupée sans préavis dans notre résidence.,COUPURE_EAU
+"Depuis les travaux, nous n’avons plus d’eau potable.",COUPURE_EAU
+Le robinet est sec dans plusieurs logements.,COUPURE_EAU
+La distribution semble interrompue depuis plusieurs heures.,COUPURE_EAU
+Le quartier connaît une interruption complète du service d’eau.,COUPURE_EAU
+Aucune eau n’arrive dans les appartements depuis midi.,COUPURE_EAU
+La pression a disparu et l’eau ne coule plus.,COUPURE_EAU
+Nous voulons signaler l’absence totale d’eau dans notre rue.,COUPURE_EAU
+Le réseau ne fournit plus d’eau aux maisons du secteur.,COUPURE_EAU
+La coupure d’eau annoncée se prolonge au-delà de l’horaire prévu.,COUPURE_EAU
+Plus d’eau dans le quartier depuis la nuit dernière.,COUPURE_EAU
+Le compteur d’eau semble cassé et affiche des chiffres anormaux.,AUTRE
+Je souhaite demander le déplacement de mon compteur.,AUTRE
+Le couvercle du compteur est endommagé.,AUTRE
+Je voudrais obtenir des informations sur ma facture d’eau.,AUTRE
+"Une bouche d’accès au réseau est bloquée, sans fuite visible.",AUTRE
+Le robinet public est difficile à ouvrir.,AUTRE
+Je souhaite demander un nouveau raccordement au réseau.,AUTRE
+Le compteur affiche un code d’erreur.,AUTRE
+Une borne d’eau publique a besoin d’un nettoyage.,AUTRE
+Je veux connaître la date de la prochaine maintenance du réseau.,AUTRE
+Le regard de visite est cassé mais aucune eau ne s’écoule.,AUTRE
+Je souhaite transmettre une question au service des eaux.,AUTRE
+Un panneau signalant les travaux du réseau est tombé.,AUTRE
+Je demande la vérification de mon compteur de consommation.,AUTRE
+Une bouche d’incendie est difficile d’accès.,AUTRE
+Je voudrais connaître les horaires du service client.,AUTRE
+Le numéro de mon compteur est illisible.,AUTRE
+Je signale un problème administratif concernant mon abonnement.,AUTRE
+Le coffret de protection du compteur est abîmé.,AUTRE
+Je souhaite modifier les coordonnées associées à mon contrat.,AUTRE
+Une plaque métallique du regard est manquante.,AUTRE
+Je voudrais savoir comment demander un raccordement.,AUTRE
+Le compteur d’eau fait un bruit inhabituel.,AUTRE
+Je signale un obstacle devant une installation du réseau.,AUTRE
+J’ai besoin d’informations sur les démarches de résiliation.,AUTRE

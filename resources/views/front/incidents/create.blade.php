@@ -9,6 +9,22 @@
     <section class="section contact-layout">
         <form class="contact-form validated-form" method="POST" action="{{ route('front.incidents.store') }}" enctype="multipart/form-data" novalidate id="form_incident">
             @csrf
+            <label>Titre
+                <input name="title" type="text" data-label="Titre" data-rules="required|min:3|max:255" value="{{ old('title') }}" placeholder="Ex. Fuite sur conduite principale">
+                @error('title')<small class="field-error">{{ $message }}</small>@enderror
+            </label>
+            <label>Description
+                <textarea name="description" rows="6" data-label="Description" data-rules="required|min:10|max:5000" placeholder="Décrivez ce que vous avez observé..." id="incident-description">{{ old('description') }}</textarea>
+                @error('description')<small class="field-error">{{ $message }}</small>@enderror
+                <button type="button" class="button button-secondary ai-suggest-btn" id="ai-suggest-btn">
+                    🤖 Suggérer le type avec l'IA
+                </button>
+                <div id="ai-suggestion" class="ai-suggestion" style="display: none;">
+                    <span class="ai-suggestion-label">Suggestion IA :</span>
+                    <span id="ai-suggestion-text" class="ai-suggestion-text"></span>
+                    <small id="ai-confidence" class="ai-confidence"></small>
+                </div>
+            </label>
             <fieldset class="signalement-type">
                 <legend>Type de signalement</legend>
                 <label class="signalement-option" for="type-fuite">
@@ -32,14 +48,6 @@
                     <input id="type-equipement" type="radio" name="type" value="Équipement hors ligne" @checked(old('type') === 'Équipement hors ligne')>
                 </label>
             </fieldset>
-            <label>Titre
-                <input name="title" type="text" data-label="Titre" data-rules="required|min:3|max:255" value="{{ old('title') }}" placeholder="Ex. Fuite sur conduite principale">
-                @error('title')<small class="field-error">{{ $message }}</small>@enderror
-            </label>
-            <label>Description
-                <textarea name="description" rows="6" data-label="Description" data-rules="required|min:10|max:5000" placeholder="Décrivez ce que vous avez observé...">{{ old('description') }}</textarea>
-                @error('description')<small class="field-error">{{ $message }}</small>@enderror
-            </label>
             <label>Localisation
                 <input name="location" type="text" data-label="Localisation" data-rules="required|min:3|max:255" value="{{ old('location') }}" placeholder="Adresse, commune ou infrastructure">
                 @error('location')<small class="field-error">{{ $message }}</small>@enderror
@@ -91,3 +99,77 @@
         </div>
     </section>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const descriptionInput = document.getElementById('incident-description');
+            const suggestBtn = document.getElementById('ai-suggest-btn');
+            const suggestionDiv = document.getElementById('ai-suggestion');
+            const suggestionText = document.getElementById('ai-suggestion-text');
+            const confidenceText = document.getElementById('ai-confidence');
+
+            if (!descriptionInput || !suggestBtn) return;
+
+            suggestBtn.addEventListener('click', async function() {
+                const description = descriptionInput.value.trim();
+
+                if (description.length < 5) {
+                    alert('Veuillez entrer une description d\'au moins 5 caractères.');
+                    return;
+                }
+
+                suggestBtn.disabled = true;
+                suggestBtn.textContent = '⏳ Analyse en cours...';
+
+                try {
+                    const response = await fetch('/api/classification/predict', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        },
+                        body: JSON.stringify({ description: description })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        suggestionText.textContent = data.data.categorie;
+                        confidenceText.textContent = `Confiance : ${(data.data.confidence * 100).toFixed(1)}%`;
+                        suggestionDiv.style.display = 'flex';
+
+                        const typeMapping = {
+                            'FUITE_EAU': 'Fuite d\'eau',
+                            'CONTAMINATION_SUSPECTEE': 'Contamination',
+                            'COUPURE_EAU': 'Coupure liée à la sécheresse',
+                            'AUTRE': 'Fuite d\'eau'
+                        };
+
+                        const mappedType = typeMapping[data.data.categorie] || 'Fuite d\'eau';
+                        const radioInput = document.querySelector(`input[name="type"][value="${mappedType}"]`);
+
+                        if (radioInput) {
+                            radioInput.checked = true;
+                            radioInput.closest('.signalement-option').style.transform = 'scale(1.05)';
+                            setTimeout(() => {
+                                radioInput.closest('.signalement-option').style.transform = '';
+                            }, 300);
+                        }
+                    } else {
+                        alert('Erreur : ' + (data.error || 'Impossible de contacter le service de classification IA.'));
+                        suggestionDiv.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('Erreur AI:', error);
+                    alert('Erreur de connexion au service de classification IA. Vérifiez que le serveur Flask est en cours d\'exécution.');
+                    suggestionDiv.style.display = 'none';
+                } finally {
+                    suggestBtn.disabled = false;
+                    suggestBtn.textContent = '🤖 Suggérer le type avec l\'IA';
+                }
+            });
+        });
+    </script>
+@endpush
