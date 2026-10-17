@@ -133,21 +133,43 @@
         </label>
 
         {{-- Section 2: Affectation --}}
-        <div class="form-full" style="border-bottom: 1px solid var(--line); padding-bottom: 8px; margin: 16px 0 4px;">
-            <span class="eyebrow">2. RESSOURCES HUMAINES</span>
-            <h2 style="font-size: 18px; margin: 4px 0 0;">Affectation technique</h2>
+        <div class="form-full" style="border-bottom: 1px solid var(--line); padding-bottom: 8px; margin: 16px 0 4px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 8px;">
+            <div>
+                <span class="eyebrow">2. RESSOURCES HUMAINES</span>
+                <h2 style="font-size: 18px; margin: 4px 0 0;">Affectation technique</h2>
+            </div>
+            @if(empty($maintenance?->technician_assignment_locked))
+                <button type="button" class="button button-small" id="btn-recommend-tech" onclick="openTechRecommendationModal()" style="background: linear-gradient(135deg, var(--deep) 0%, #1e3a47 100%); border: 1px solid var(--aqua); color: #fff; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(22, 183, 163, 0.2);">
+                    <span style="color: var(--aqua);">✨</span> Recommander un technicien avec l'IA
+                </button>
+            @endif
         </div>
 
         <label>
             Technicien responsable
-            <select name="technician_id" id="select_technician_id" class="{{ $errors->has('technician_id') ? 'is-invalid' : '' }}">
-                <option value="">Aucun technicien assigné</option>
-                @foreach($technicians as $tech)
-                    <option value="{{ $tech->id }}" @selected(old('technician_id', $maintenance->technician_id ?? '') == $tech->id)>
-                        {{ $tech->name }} @if($tech->speciality) ({{ $tech->speciality }}) @endif
-                    </option>
-                @endforeach
-            </select>
+            @if(!empty($maintenance?->technician_assignment_locked))
+                <select id="select_technician_id" disabled style="background: #f1f5f9; cursor: not-allowed; color: #475569;" class="{{ $errors->has('technician_id') ? 'is-invalid' : '' }}">
+                    @foreach($technicians as $tech)
+                        <option value="{{ $tech->id }}" @selected($maintenance->technician_id == $tech->id)>
+                            {{ $tech->name }} @if($tech->speciality) ({{ $tech->speciality }}) @endif
+                        </option>
+                    @endforeach
+                </select>
+                <input type="hidden" name="technician_id" value="{{ $maintenance->technician_id }}">
+                <div style="margin-top: 6px; padding: 8px 12px; background: #def5ed; border: 1px solid #13886f; border-radius: 4px; font-size: 12px; color: #13886f; display: flex; align-items: center; gap: 8px;">
+                    <span>🔒</span>
+                    <span><strong>Affectation Verrouillée :</strong> {{ $maintenance->technician?->name }} a accepté cette intervention. La réattribution est bloquée.</span>
+                </div>
+            @else
+                <select name="technician_id" id="select_technician_id" class="{{ $errors->has('technician_id') ? 'is-invalid' : '' }}">
+                    <option value="">Aucun technicien assigné</option>
+                    @foreach($technicians as $tech)
+                        <option value="{{ $tech->id }}" @selected(old('technician_id', $maintenance->technician_id ?? '') == $tech->id)>
+                            {{ $tech->name }} @if($tech->speciality) ({{ $tech->speciality }}) @endif
+                        </option>
+                    @endforeach
+                </select>
+            @endif
             <div class="validation-feedback" data-field="technician_id">
                 @error('technician_id')
                     <span class="field-error-badge" role="alert">
@@ -157,6 +179,9 @@
                         <span>{{ $message }}</span>
                     </span>
                 @enderror
+            </div>
+            <div id="ai-tech-selected-badge" style="display: none; margin-top: 6px; padding: 6px 10px; background: #eef9f7; border: 1px solid rgba(22,183,163,0.3); border-radius: 4px; font-size: 11px; color: var(--deep); align-items: center; gap: 6px;">
+                <span style="color: var(--aqua);">✨</span> <span>Sélectionné via l'IA : <strong id="ai-tech-selected-name"></strong> (<span id="ai-tech-selected-reason"></span>)</span>
             </div>
         </label>
 
@@ -440,4 +465,240 @@ document.addEventListener('DOMContentLoaded', function () {
     checkStatus();
     syncTimestamps();
 });
+
+// AI Technician Matchmaker Modal Logic
+function openTechRecommendationModal() {
+    const modal = document.getElementById('modal-tech-recommendation');
+    if (!modal) return;
+
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    // Show loading state, hide results & empty state
+    document.getElementById('tech-rec-loading').style.display = 'block';
+    document.getElementById('tech-rec-results').style.display = 'none';
+    document.getElementById('tech-rec-empty').style.display = 'none';
+    document.getElementById('tech-rec-error').style.display = 'none';
+
+    // Gather form context
+    const type = document.getElementById('select_type')?.value || 'Préventive';
+    const priority = document.getElementById('select_priority')?.value || 'medium';
+    const infraId = document.getElementById('select_infrastructure_id')?.value || '';
+    const desc = document.getElementById('textarea_description')?.value || '';
+
+    // Update context preview in modal
+    document.getElementById('tech-rec-ctx-type').textContent = type;
+    document.getElementById('tech-rec-ctx-priority').textContent = priority.toUpperCase();
+    
+    const infraSelect = document.getElementById('select_infrastructure_id');
+    const infraText = infraSelect && infraSelect.selectedIndex > 0 ? infraSelect.options[infraSelect.selectedIndex].text : 'Non spécifiée';
+    document.getElementById('tech-rec-ctx-infra').textContent = infraText;
+
+    fetch("{{ route('maintenances.recommend-technicians') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+            @if(isset($maintenance))
+            maintenance_id: {{ $maintenance->id }},
+            @endif
+            type: type,
+            priority: priority,
+            infrastructure_id: infraId ? parseInt(infraId) : null,
+            description: desc,
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('tech-rec-loading').style.display = 'none';
+
+        if (!data.success) {
+            document.getElementById('tech-rec-error').style.display = 'block';
+            document.getElementById('tech-rec-error-msg').textContent = data.message || "Une erreur est survenue lors de l'analyse.";
+            return;
+        }
+
+        const recs = data.recommendations;
+        const rankings = recs.candidate_rankings || [];
+
+        if (rankings.length === 0) {
+            document.getElementById('tech-rec-empty').style.display = 'block';
+            document.getElementById('tech-rec-empty-reason').textContent = recs.no_suitable_candidate_reason || "Aucun technicien éligible n'a été trouvé pour cette intervention.";
+            return;
+        }
+
+        renderCandidateRankings(rankings, recs.is_ai_generated);
+        document.getElementById('tech-rec-results').style.display = 'block';
+    })
+    .catch(err => {
+        document.getElementById('tech-rec-loading').style.display = 'none';
+        document.getElementById('tech-rec-error').style.display = 'block';
+        document.getElementById('tech-rec-error-msg').textContent = "Erreur de connexion au service d'analyse IA.";
+    });
+}
+
+function closeTechRecommendationModal() {
+    const modal = document.getElementById('modal-tech-recommendation');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function renderCandidateRankings(rankings, isAi) {
+    const container = document.getElementById('tech-rec-cards-container');
+    container.innerHTML = '';
+
+    const aiBadge = document.getElementById('tech-rec-ai-badge');
+    if (aiBadge) {
+        aiBadge.textContent = isAi ? '✨ Analyse Groq AI (gpt-oss-120b)' : '⚡ Analyse Déterministe AquaSecure';
+    }
+
+    rankings.forEach((cand, idx) => {
+        const isTop = (cand.rank === 1);
+        const card = document.createElement('div');
+        card.style.cssText = isTop
+            ? 'border: 2px solid var(--aqua); background: linear-gradient(180deg, #f4fbf9 0%, #ffffff 100%); border-radius: 8px; padding: 18px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(22, 183, 163, 0.15);'
+            : 'border: 1px solid var(--line); background: #ffffff; border-radius: 8px; padding: 16px; margin-bottom: 14px;';
+
+        const matchClass = cand.specialty_match === 'Excellente' ? 'background: #d1fae5; color: #065f46;' : (cand.specialty_match === 'Bonne' ? 'background: #e0f2fe; color: #0369a1;' : 'background: #fef3c7; color: #92400e;');
+
+        const advantagesHtml = (cand.advantages || []).map(adv => `<li style="margin-bottom: 3px;">✓ ${escapeHtml(adv)}</li>`).join('');
+        const limitationsHtml = (cand.limitations || []).map(lim => `<li style="margin-bottom: 3px; color: #b45309;">⚠ ${escapeHtml(lim)}</li>`).join('');
+
+        card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; font-weight: 800; font-size: 14px; ${isTop ? 'background: var(--aqua); color: #fff;' : 'background: #f1f5f9; color: var(--ink);'}">
+                        #${cand.rank}
+                    </span>
+                    <div>
+                        <strong style="font-size: 15px; color: var(--deep); display: block;">${escapeHtml(cand.name)}</strong>
+                        <span style="font-size: 12px; color: var(--muted);">${escapeHtml(cand.speciality)}</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; ${matchClass}">
+                        ${escapeHtml(cand.specialty_match)}
+                    </span>
+                    <span style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #f1f5f9; color: var(--ink);">
+                        💼 ${escapeHtml(cand.workload_summary)}
+                    </span>
+                </div>
+            </div>
+
+            <p style="font-size: 13px; color: var(--ink); margin: 0 0 10px; line-height: 1.45; background: ${isTop ? '#ffffff' : '#fbfdfc'}; padding: 10px; border-radius: 6px; border: 1px solid var(--line);">
+                <strong>Avis technique :</strong> ${escapeHtml(cand.reasoning)}
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; margin-bottom: 12px;">
+                <div>
+                    <span style="font-weight: 700; color: #065f46; font-size: 11px; text-transform: uppercase;">Points forts</span>
+                    <ul style="list-style: none; padding: 0; margin: 4px 0 0; color: #047857;">${advantagesHtml || '<li>Aucun point fort particulier</li>'}</ul>
+                </div>
+                <div>
+                    <span style="font-weight: 700; color: #92400e; font-size: 11px; text-transform: uppercase;">Vigilance</span>
+                    <ul style="list-style: none; padding: 0; margin: 4px 0 0;">${limitationsHtml || '<li style="color: var(--muted);">Aucune restriction détectée</li>'}</ul>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; align-items: center; border-top: 1px dashed var(--line); padding-top: 10px;">
+                <button type="button" class="button button-small" onclick="selectRecommendedTechnician(${cand.technician_id}, '${escapeHtml(cand.name).replace(/'/g, "\\'")}', '${escapeHtml(cand.specialty_match).replace(/'/g, "\\'")}')" style="${isTop ? 'background: var(--aqua);' : 'background: var(--deep);'} color: #fff;">
+                    ✓ Affecter ce technicien
+                </button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function selectRecommendedTechnician(techId, techName, matchLabel) {
+    const select = document.getElementById('select_technician_id');
+    if (select) {
+        select.value = techId;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+
+        const badge = document.getElementById('ai-tech-selected-badge');
+        const nameSpan = document.getElementById('ai-tech-selected-name');
+        const reasonSpan = document.getElementById('ai-tech-selected-reason');
+
+        if (badge && nameSpan && reasonSpan) {
+            nameSpan.textContent = techName;
+            reasonSpan.textContent = `Compatibilité ${matchLabel}`;
+            badge.style.display = 'inline-flex';
+        }
+    }
+
+    closeTechRecommendationModal();
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 </script>
+
+{{-- Modal: AI Technician Matchmaker --}}
+<div id="modal-tech-recommendation" class="intelligence-modal-backdrop" style="display: none;" onclick="if(event.target === this) closeTechRecommendationModal()">
+    <div class="intelligence-modal-dialog" style="max-width: 760px; max-height: 88vh; background: #fff; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow: hidden; margin: auto;">
+        {{-- Header --}}
+        <div class="intelligence-modal-header" style="padding: 18px 24px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: flex-start; background: #fbfdfc; flex-shrink: 0;">
+            <div>
+                <span class="eyebrow" style="color: var(--aqua); font-size: 11px; font-weight: 800; letter-spacing: 0.1em;">AI TECHNICIAN MATCHMAKER · INTELLIGENCE OPÉRATIONNELLE</span>
+                <h2 style="margin: 4px 0 0; font-size: 20px; color: var(--deep);">Recommandation des Meilleurs Techniciens Éligibles</h2>
+                <small style="color: var(--muted);">Classement factuel basé sur les spécialités, disponibilités réelles et charges de travail</small>
+            </div>
+            <button class="modal-close-btn" type="button" onclick="closeTechRecommendationModal()" style="border: 0; background: none; font-size: 20px; cursor: pointer; color: var(--muted);">✕</button>
+        </div>
+
+        {{-- Mission Context Pill Strip --}}
+        <div style="background: #f1f8f7; border-bottom: 1px solid var(--line); padding: 10px 24px; display: flex; gap: 14px; font-size: 12px; color: var(--deep); flex-shrink: 0; flex-wrap: wrap;">
+            <span>🔧 Mission : <strong id="tech-rec-ctx-type">—</strong></span>
+            <span>⚡ Priorité : <strong id="tech-rec-ctx-priority">—</strong></span>
+            <span>▦ Site : <strong id="tech-rec-ctx-infra">—</strong></span>
+            <span id="tech-rec-ai-badge" style="margin-left: auto; font-weight: 700; color: var(--aqua);">✨ Analyse Groq AI</span>
+        </div>
+
+        {{-- Scrollable Body --}}
+        <div class="intelligence-modal-body" style="padding: 20px 24px; overflow-y: auto; flex: 1 1 auto; min-height: 0;">
+            {{-- Loading State --}}
+            <div id="tech-rec-loading" style="display: none; text-align: center; padding: 40px 20px;">
+                <div style="width: 48px; height: 48px; border: 4px solid #e2e8f0; border-top-color: var(--aqua); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;"></div>
+                <h3 style="font-size: 16px; margin: 0 0 6px; color: var(--deep);">Recherche et classement des techniciens en cours…</h3>
+                <p style="font-size: 13px; color: var(--muted); margin: 0;">Évaluation des contraintes d'éligibilité, calcul des correspondances techniques et pondération des charges actives.</p>
+            </div>
+
+            {{-- Error State --}}
+            <div id="tech-rec-error" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+                <strong style="color: #991b1b; display: block; margin-bottom: 4px;">Échec de la recommandation</strong>
+                <p id="tech-rec-error-msg" style="color: #b91c1c; font-size: 13px; margin: 0;"></p>
+            </div>
+
+            {{-- Empty State --}}
+            <div id="tech-rec-empty" style="display: none; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 20px; text-align: center;">
+                <div style="font-size: 28px; margin-bottom: 8px;">👷‍♂️</div>
+                <h4 style="font-size: 15px; color: #92400e; margin: 0 0 6px;">Aucun candidat éligible disponible</h4>
+                <p id="tech-rec-empty-reason" style="font-size: 13px; color: #b45309; margin: 0;"></p>
+            </div>
+
+            {{-- Results Container --}}
+            <div id="tech-rec-results" style="display: none;">
+                <div id="tech-rec-cards-container"></div>
+            </div>
+        </div>
+
+        {{-- Footer --}}
+        <div class="intelligence-modal-footer" style="padding: 14px 24px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; background: #fbfdfc; flex-shrink: 0;">
+            <button type="button" class="button button-outline" onclick="closeTechRecommendationModal()">Fermer</button>
+        </div>
+    </div>
+</div>
+

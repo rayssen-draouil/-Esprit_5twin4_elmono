@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Maintenance extends Model
 {
@@ -16,10 +18,18 @@ class Maintenance extends Model
         'infrastructure_id',
         'reference_code',
         'technician_id',
+        'technician_assignment_locked',
+        'assignment_accepted_at',
         'team',
         'type',
         'description',
         'result',
+        'completion_submitted_at',
+        'completion_report',
+        'completion_validated_at',
+        'completion_validated_by',
+        'manager_validation_notes',
+        'manager_correction_notes',
         'status',
         'priority',
         'cost',
@@ -38,6 +48,11 @@ class Maintenance extends Model
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
             'performed_at' => 'datetime',
+            'assignment_accepted_at' => 'datetime',
+            'completion_submitted_at' => 'datetime',
+            'completion_validated_at' => 'datetime',
+            'completion_report' => 'array',
+            'technician_assignment_locked' => 'boolean',
             'next_maintenance_date' => 'date',
             'cost' => 'float',
             'duration_hours' => 'float',
@@ -56,6 +71,26 @@ class Maintenance extends Model
     public function technician(): BelongsTo
     {
         return $this->belongsTo(Technicien::class, 'technician_id');
+    }
+
+    public function validator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completion_validated_by');
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(MaintenanceAssignmentInvitation::class);
+    }
+
+    public function latestInvitation(): HasOne
+    {
+        return $this->hasOne(MaintenanceAssignmentInvitation::class)->latestOfMany();
+    }
+
+    public function pendingInvitation(): HasOne
+    {
+        return $this->hasOne(MaintenanceAssignmentInvitation::class)->where('status', 'pending')->latestOfMany();
     }
 
     /* -------------------------------------------------------------------------
@@ -160,8 +195,9 @@ class Maintenance extends Model
             'reported' => 'Signalée (En attente)',
             'overdue' => 'En retard',
             'planned' => 'Planifiée',
-            'in_progress' => 'En cours',
-            'completed' => 'Terminée',
+            'in_progress' => 'En cours d\'exécution',
+            'awaiting_validation' => 'En attente de validation',
+            'completed' => 'Terminée & Validée',
             'cancelled' => 'Annulée',
             default => ucfirst($this->display_status),
         };
@@ -174,10 +210,36 @@ class Maintenance extends Model
             'overdue' => 'badge-danger',
             'completed' => 'badge-success',
             'in_progress' => 'badge-info',
+            'awaiting_validation' => 'badge-warning',
             'planned' => 'badge-warning',
             'cancelled' => 'badge-neutral',
             default => 'badge-neutral',
         };
+    }
+
+    public function isLocked(): bool
+    {
+        return (bool) $this->technician_assignment_locked;
+    }
+
+    public function canBeAccepted(): bool
+    {
+        return $this->status === 'planned' && !$this->isLocked();
+    }
+
+    public function isInProgress(): bool
+    {
+        return $this->status === 'in_progress';
+    }
+
+    public function isAwaitingValidation(): bool
+    {
+        return $this->status === 'awaiting_validation';
+    }
+
+    public function isCompleted(): bool
+    {
+        return $this->status === 'completed';
     }
 
     public function getPriorityLabelAttribute(): string

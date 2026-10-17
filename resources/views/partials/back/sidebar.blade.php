@@ -40,6 +40,11 @@
                 ⛯ <span>Maintenances</span>
             </a>
 
+            <a class="{{ request()->routeIs('maintenance-intelligence.*') ? 'active' : '' }}"
+               href="{{ route('maintenance-intelligence.index') }}">
+                ✨ <span>AI Maintenance Intelligence</span>
+            </a>
+
             <a class="{{ request()->routeIs('interventions.*') ? 'active' : '' }}"
                href="{{ route('interventions.index') }}">
                 ⚒ <span>Interventions</span>
@@ -70,6 +75,15 @@
                     ♙ <span>Utilisateurs</span>
                 </a>
             @endif
+        @endif
+
+        @if(in_array(Auth::user()->role, ['technician'], true))
+            <p class="sidebar-label">ESPACE OPÉRATIONNEL</p>
+
+            <a class="{{ request()->routeIs('technicien.interventions.*') ? 'active' : '' }}"
+               href="{{ route('technicien.interventions.index') }}">
+                ⚒ <span>Mes interventions</span>
+            </a>
         @endif
     </nav>
 

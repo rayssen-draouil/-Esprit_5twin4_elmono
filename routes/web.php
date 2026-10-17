@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Back\AiIntelligenceSuiteController;
 use App\Http\Controllers\Back\AlertController;
 use App\Http\Controllers\Back\BackController;
+use App\Http\Controllers\Back\MaintenanceIntelligenceController;
 use App\Http\Controllers\Back\ZoneController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
@@ -10,9 +12,11 @@ use App\Http\Controllers\Front\FrontController;
 use App\Http\Controllers\InfrastructureController;
 use App\Http\Controllers\InterventionController;
 use App\Http\Controllers\MaintenanceController;
+use App\Http\Controllers\MaintenanceInvitationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TechnicienController;
+use App\Http\Controllers\Technician\TechnicianInterventionController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,6 +56,11 @@ Route::get('/funding', [FrontController::class, 'funding'])->name('front.funding
 Route::get('/news', [FrontController::class, 'news'])->name('front.news');
 Route::get('/contact', [FrontController::class, 'contact'])->name('front.contact');
 
+// Brevo Email Assignment Invitation Workflow (Token protected)
+Route::get('/maintenances/invitation/{token}', [MaintenanceInvitationController::class, 'show'])->name('maintenances.invitation.show');
+Route::post('/maintenances/invitation/{token}/accept', [MaintenanceInvitationController::class, 'accept'])->name('maintenances.invitation.accept');
+Route::post('/maintenances/invitation/{token}/decline', [MaintenanceInvitationController::class, 'decline'])->name('maintenances.invitation.decline');
+
 Route::middleware(['auth', 'role:admin,manager,gestionnaire'])->prefix('back')->name('back.')->group(function () {
     Route::get('/', [BackController::class, 'dashboard'])->name('dashboard');
     Route::get('/incidents', [BackController::class, 'incidents'])->name('incidents');
@@ -82,6 +91,29 @@ Route::middleware(['auth', 'role:admin,manager,gestionnaire'])->prefix('admin')-
     Route::resource('infrastructures', InfrastructureController::class)->names('infrastructures');
     Route::resource('maintenances', MaintenanceController::class)->names('maintenances');
     Route::post('/maintenances/{maintenance}/start', [MaintenanceController::class, 'start'])->name('maintenances.start');
+    Route::post('/maintenances/{maintenance}/validate-completion', [MaintenanceController::class, 'validateCompletion'])->name('maintenances.validate-completion');
+    Route::post('/maintenances/{maintenance}/request-corrections', [MaintenanceController::class, 'requestCorrections'])->name('maintenances.request-corrections');
+    Route::post('/maintenances/{maintenance}/resend-invitation', [MaintenanceController::class, 'resendInvitation'])->name('maintenances.resend-invitation');
+
+    // AI Maintenance Intelligence Center (Stage 1: Scan & Stage 2: Planner)
+    Route::get('/maintenance-intelligence', [MaintenanceIntelligenceController::class, 'index'])->name('maintenance-intelligence.index');
+    Route::post('/maintenance-intelligence/scan', [MaintenanceIntelligenceController::class, 'scan'])->middleware('throttle:15,1')->name('maintenance-intelligence.scan');
+    Route::post('/maintenance-intelligence/plan', [MaintenanceIntelligenceController::class, 'generatePlan'])->middleware('throttle:20,1')->name('maintenance-intelligence.plan');
+    Route::post('/maintenance-intelligence/store-maintenance', [MaintenanceIntelligenceController::class, 'storeMaintenance'])->name('maintenance-intelligence.store-maintenance');
+
+    // AquaSecure AI Intelligence Suite
+    // Feature 1: AI Infrastructure Health Analyst
+    Route::post('/infrastructures/{infrastructure}/ai-health', [AiIntelligenceSuiteController::class, 'analyzeInfrastructure'])->middleware('throttle:20,1')->name('infrastructures.ai-health');
+    Route::get('/infrastructures/{infrastructure}/ai-health', [AiIntelligenceSuiteController::class, 'getInfrastructureAnalysis'])->name('infrastructures.get-ai-health');
+
+    // Feature 2: Smart Citizen Report Analyzer
+    Route::post('/signalements/{signalement}/ai-analyze', [AiIntelligenceSuiteController::class, 'analyzeReport'])->middleware('throttle:20,1')->name('signalements.ai-analyze');
+    Route::post('/signalements/{signalement}/ai-accept', [AiIntelligenceSuiteController::class, 'acceptReportSuggestions'])->name('signalements.ai-accept');
+    Route::post('/signalements/{signalement}/ai-edit', [AiIntelligenceSuiteController::class, 'editReportClassification'])->name('signalements.ai-edit');
+
+    // Feature 3: AI Technician Matchmaker
+    Route::post('/maintenances/recommend-technicians', [AiIntelligenceSuiteController::class, 'recommendTechnicians'])->middleware('throttle:25,1')->name('maintenances.recommend-technicians');
+    Route::post('/maintenances/{maintenance}/assign-technician', [AiIntelligenceSuiteController::class, 'assignTechnician'])->name('maintenances.assign-technician');
 
     Route::resource('projects', ProjectController::class)
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
@@ -99,3 +131,11 @@ Route::middleware(['auth', 'role:admin,manager,gestionnaire'])->prefix('admin')-
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
         ->names('techniciens');
 });
+
+// Dedicated Technician Workspace (Mes interventions)
+Route::middleware(['auth', 'role:technician,admin'])->prefix('technicien')->name('technicien.')->group(function () {
+    Route::get('/interventions', [TechnicianInterventionController::class, 'index'])->name('interventions.index');
+    Route::get('/interventions/{maintenance}', [TechnicianInterventionController::class, 'show'])->name('interventions.show');
+    Route::post('/interventions/{maintenance}/complete', [TechnicianInterventionController::class, 'submitCompletion'])->name('interventions.complete');
+});
+

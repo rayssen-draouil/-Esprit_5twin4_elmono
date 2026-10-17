@@ -30,7 +30,7 @@ class UpdateMaintenanceRequest extends FormRequest
             'team' => ['nullable', 'string', 'max:255', 'regex:/^[\p{L}\s\-\'.]+$/u'],
             'type' => ['required', 'string', 'max:100'],
             'priority' => ['required', 'in:low,medium,high,critical'],
-            'status' => ['required', 'in:planned,in_progress,completed,cancelled,reported'],
+            'status' => ['required', 'in:planned,in_progress,awaiting_validation,completed,cancelled,reported'],
             'scheduled_at' => ['required', 'date'],
             'started_at' => ['nullable', 'date', 'before_or_equal:now'],
             'completed_at' => ['nullable', 'date', 'before_or_equal:now'],
@@ -50,6 +50,20 @@ class UpdateMaintenanceRequest extends FormRequest
             $startedAt = $this->input('started_at');
             $completedAt = $this->input('completed_at');
             $nextDate = $this->input('next_maintenance_date');
+
+            // Logic 0: Locked technician assignment cannot be silently changed
+            $maintenanceId = $this->route('maintenance')?->id ?? $this->route('maintenance');
+            if ($maintenanceId) {
+                $maintenance = \App\Models\Maintenance::find($maintenanceId);
+                if ($maintenance && $maintenance->technician_assignment_locked && $this->has('technician_id')) {
+                    if ((int) $this->input('technician_id') !== (int) $maintenance->technician_id) {
+                        $v->errors()->add(
+                            'technician_id',
+                            "L'intervention a été acceptée par le technicien. Son affectation est verrouillée et ne peut plus être modifiée."
+                        );
+                    }
+                }
+            }
 
             // Logic 1: Completed status requires a technical result
             if ($status === 'completed' && empty($this->input('result'))) {

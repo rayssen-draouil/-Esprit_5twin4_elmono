@@ -30,6 +30,8 @@ class Infrastructure extends Model
         'last_maintenance_date',
         'next_maintenance_date',
         'image_path',
+        'ai_health_analysis',
+        'ai_health_analyzed_at',
     ];
 
     protected function casts(): array
@@ -41,6 +43,8 @@ class Infrastructure extends Model
             'next_maintenance_date' => 'date',
             'latitude' => 'float',
             'longitude' => 'float',
+            'ai_health_analysis' => 'array',
+            'ai_health_analyzed_at' => 'datetime',
         ];
     }
 

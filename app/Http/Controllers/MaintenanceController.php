@@ -7,12 +7,26 @@ use App\Http\Requests\UpdateMaintenanceRequest;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\Technicien;
+use App\Services\MaintenanceLifecycleService;
+use App\Services\TechnicianAssignmentInvitationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class MaintenanceController extends Controller
 {
+    protected MaintenanceLifecycleService $lifecycleService;
+    protected TechnicianAssignmentInvitationService $invitationService;
+
+    public function __construct(
+        MaintenanceLifecycleService $lifecycleService,
+        TechnicianAssignmentInvitationService $invitationService
+    ) {
+        $this->lifecycleService = $lifecycleService;
+        $this->invitationService = $invitationService;
+    }
+
     public function index(Request $request): View
     {
         // 1. Real KPIs from DB
@@ -149,7 +163,12 @@ class MaintenanceController extends Controller
 
     public function show(Maintenance $maintenance): View
     {
-        $maintenance->load(['infrastructure.zone', 'technician']);
+        $maintenance->load([
+            'infrastructure.zone',
+            'technician',
+            'latestInvitation.technician',
+            'validator',
+        ]);
 
         return view('maintenances.show', compact('maintenance'));
     }
@@ -164,11 +183,23 @@ class MaintenanceController extends Controller
 
     public function update(UpdateMaintenanceRequest $request, Maintenance $maintenance): RedirectResponse
     {
+        // Enforce locking: Prevent ordinary update from altering locked technician
+        if ($maintenance->technician_assignment_locked && $request->filled('technician_id')) {
+            if ((int) $request->integer('technician_id') !== (int) $maintenance->technician_id) {
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->with('error', "L'intervention a été acceptée par {$maintenance->technician?->name}. L'affectation est verrouillée et ne peut être modifiée.");
+            }
+        }
+
         $validated = $request->validated();
 
         if ($validated['status'] === 'completed' && empty($validated['completed_at'])) {
             $validated['completed_at'] = now();
             $validated['performed_at'] = now();
+            $validated['completion_validated_at'] = now();
+            $validated['completion_validated_by'] = Auth::id();
         }
 
         $maintenance->update($validated);
@@ -194,6 +225,88 @@ class MaintenanceController extends Controller
         return redirect()
             ->route('maintenances.show', $maintenance)
             ->with('success', "La maintenance « {$maintenance->reference_code} » a été mise à jour.");
+    }
+
+    /**
+     * Manager approves and validates technician completion.
+     */
+    public function validateCompletion(Request $request, Maintenance $maintenance): RedirectResponse
+    {
+        $notes = $request->input('manager_validation_notes');
+
+        try {
+            $this->lifecycleService->validateAndClose($maintenance, Auth::user(), $notes);
+
+            $target = $request->input('redirect_to') === 'dashboard'
+                ? redirect()->route('manager.dashboard')
+                : redirect()->route('maintenances.show', $maintenance);
+
+            return $target->with('success', "L'intervention {$maintenance->reference_code} a été validée et clôturée avec succès. Le technicien a été notifié par email Brevo.");
+        } catch (\DomainException $e) {
+            $target = $request->input('redirect_to') === 'dashboard'
+                ? redirect()->route('manager.dashboard')
+                : redirect()->route('maintenances.show', $maintenance);
+
+            return $target->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Manager requests technical corrections from the technician.
+     */
+    public function requestCorrections(Request $request, Maintenance $maintenance): RedirectResponse
+    {
+        $request->validate([
+            'correction_notes' => ['required', 'string', 'min:5', 'max:2000'],
+        ], [
+            'correction_notes.required' => "Veuillez préciser les motifs ou compléments techniques demandés au technicien.",
+        ]);
+
+        try {
+            $this->lifecycleService->requestCorrections($maintenance, Auth::user(), $request->input('correction_notes'));
+
+            $target = $request->input('redirect_to') === 'dashboard'
+                ? redirect()->route('manager.dashboard')
+                : redirect()->route('maintenances.show', $maintenance);
+
+            return $target->with('info', "Demande de compléments transmise au technicien. L'opération a été remise au statut « En cours d'exécution ».");
+        } catch (\DomainException|\InvalidArgumentException $e) {
+            $target = $request->input('redirect_to') === 'dashboard'
+                ? redirect()->route('manager.dashboard')
+                : redirect()->route('maintenances.show', $maintenance);
+
+            return $target->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Resend an invitation if initial email delivery had failed.
+     */
+    public function resendInvitation(Request $request, Maintenance $maintenance): RedirectResponse
+    {
+        $target = $request->input('redirect_to') === 'dashboard'
+            ? redirect()->route('manager.dashboard')
+            : redirect()->back();
+
+        if (!$maintenance->technician_id) {
+            return $target->with('error', "Aucun technicien n'est sélectionné pour cette opération.");
+        }
+
+        $result = $this->invitationService->createAndSendInvitation(
+            maintenanceId: $maintenance->id,
+            technicianId: $maintenance->technician_id,
+            managerId: Auth::id()
+        );
+
+        if (!$result['success']) {
+            return $target->with('error', $result['message']);
+        }
+
+        if (!$result['email_sent']) {
+            return $target->with('error', $result['message']);
+        }
+
+        return $target->with('success', $result['message']);
     }
 
     public function destroy(Maintenance $maintenance): RedirectResponse
@@ -242,8 +355,9 @@ class MaintenanceController extends Controller
             'statuses' => [
                 'reported' => 'Signalement usager (En attente)',
                 'planned' => 'Planifiée',
-                'in_progress' => 'En cours',
-                'completed' => 'Terminée',
+                'in_progress' => 'En cours d\'exécution',
+                'awaiting_validation' => 'En attente de validation',
+                'completed' => 'Terminée & Validée',
                 'cancelled' => 'Annulée',
             ],
         ];
