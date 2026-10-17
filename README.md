@@ -311,7 +311,74 @@ php artisan up
 | **Voir l'état des tables** | `php artisan migrate:status` |
 | **Lister les URLs / Routes** | `php artisan route:list` |
 | **Purger tous les caches après modif .env** | `php artisan optimize:clear` |
+| **Démarrer le bot Telegram** | `php artisan telegram:bot` |
 | **Tester du code en direct** | `php artisan tinker` |
+
+---
+
+## 11. Bot Telegram AquaSecure 🤖
+
+Le bot permet aux citoyens de signaler un incident et de suivre leurs dossiers directement depuis Telegram, sans ouvrir le site.
+
+### Commandes disponibles
+
+| Commande | Fonction |
+| :--- | :--- |
+| `/start` | Accueil et association du compte (par e-mail) |
+| `/signaler` | Créer un nouveau signalement (type → description/photo → lieu → priorité → confirmation) |
+| `/mes_signalements` | Consulter ses 10 derniers signalements |
+| `/statut` | Vérifier l'avancement d'un dossier (`SIG-0012`, `12` ou `INC-0003`) |
+| `/aide` | Afficher les commandes disponibles |
+| `/annuler` | Annuler le formulaire en cours |
+
+### Mise en route
+
+```bash
+# 1. Créer un bot sur Telegram via @BotFather et copier le jeton
+
+# 2. Ajouter le jeton dans le fichier .env
+#    TELEGRAM_BOT_TOKEN=123456789:AAF...
+
+# 3. Appliquer la migration (colonne telegram_chat_id sur users)
+php artisan migrate
+
+# 4. Démarrer le bot en écoute (long polling, à laisser tourner dans un terminal)
+php artisan telegram:bot
+```
+
+Le bot fonctionne en **long polling** : aucune URL publique ni webhook n'est nécessaire (pratique en local).
+Le menu de commandes est automatiquement enregistré auprès de Telegram au démarrage.
+
+### Options utiles
+
+```bash
+# Enregistrer uniquement le menu de commandes puis quitter
+php artisan telegram:bot --register
+
+# Traiter un seul lot de mises à jour puis quitter (débogage)
+php artisan telegram:bot --once
+
+# Mode test utilisable depuis l'interface d'admin Telegram (@BotFather)
+```
+
+### Fonctionnement
+
+- **Association du compte** : `/start` demande l'e-mail du compte AquaSecure ; le `chat_id` Telegram est enregistré sur l'utilisateur (`users.telegram_chat_id`).
+- **Formulaire guidé** : la conversation est mémorisée en cache (`telegram:state:<chat_id>`, expiration 30 min, modifiable via `config/telegram.php`).
+- **Création** : le signalement est enregistré dans la même table que le formulaire du site (`signalements`, statut `new`), il apparaît donc immédiatement dans le back-office (`/back/incidents`).
+- **Photos** : une photo envoyée pendant l'étape description est téléchargée dans `storage/app/public/signalements/` (penser à `php artisan storage:link`).
+- **Références** : `SIG-0001` (signalement) et `INC-0001` (incident lié).
+
+### Fichiers concernés
+
+| Fichier | Rôle |
+| :--- | :--- |
+| `app/Console/Commands/TelegramBot.php` | Commande Artisan `telegram:bot` (boucle de polling) |
+| `app/Services/Telegram/TelegramApi.php` | Client HTTP minimal de l'API Telegram |
+| `app/Services/Telegram/TelegramBotService.php` | Logique des commandes et conversations |
+| `config/telegram.php` | Jeton et délais (long polling, expiration de conversation) |
+
+---
 
 ### 🗄️ Entités Principales de la Base AquaSecure :
 - `User` : Utilisateurs (`admin`, `manager`, `technician`, `citizen`)

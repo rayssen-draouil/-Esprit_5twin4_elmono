@@ -79,6 +79,7 @@ class BackController extends Controller
                     default => 'Moyenne',
                 },
                 'status' => $statusLabels[$item->status] ?? $item->status,
+                'status_raw' => $item->status,
                 'date' => $item->reported_at ? $item->reported_at->format('d M Y') : now()->format('d M Y'),
             ];
         });

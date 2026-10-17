@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'ai_classification' => [
+        'url' => env('AI_CLASSIFICATION_URL', 'http://127.0.0.1:5000'),
+    ],
+
 ];
