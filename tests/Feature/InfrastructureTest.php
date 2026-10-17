@@ -6,11 +6,21 @@ use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Zone;
+use Database\Seeders\InfrastructureMaintenanceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class InfrastructureTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+        $this->seed(InfrastructureMaintenanceSeeder::class);
+    }
+
     private function getAdminUser(): User
     {
         return User::where('role', 'admin')->first()
@@ -49,7 +59,7 @@ class InfrastructureTest extends TestCase
     public function test_admin_can_search_infrastructures(): void
     {
         $admin = $this->getAdminUser();
-        $zone = Zone::first() ?? Zone::create(['name' => 'Zone Test']);
+        $zone = Zone::first() ?? Zone::factory()->create();
 
         $infra = Infrastructure::create([
             'zone_id' => $zone->id,
@@ -72,7 +82,7 @@ class InfrastructureTest extends TestCase
     public function test_admin_can_create_infrastructure(): void
     {
         $admin = $this->getAdminUser();
-        $zone = Zone::first() ?? Zone::create(['name' => 'Zone Test']);
+        $zone = Zone::first() ?? Zone::factory()->create();
 
         $data = [
             'name' => 'Nouvelle Station Test 2026',
@@ -258,7 +268,7 @@ class InfrastructureTest extends TestCase
     public function test_infrastructure_name_validation_requires_letters(): void
     {
         $admin = $this->getAdminUser();
-        $zone = Zone::first() ?? Zone::create(['name' => 'Zone Test']);
+        $zone = Zone::first() ?? Zone::factory()->create();
 
         // Digits-only name should be rejected
         $response = $this->actingAs($admin)->post(route('infrastructures.store'), [

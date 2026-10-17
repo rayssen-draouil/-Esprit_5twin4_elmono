@@ -7,10 +7,21 @@ use App\Models\Maintenance;
 use App\Models\Technicien;
 use App\Models\User;
 use App\Models\Zone;
+use Database\Seeders\InfrastructureMaintenanceSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class MaintenanceTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+        $this->seed(InfrastructureMaintenanceSeeder::class);
+    }
+
     private function getAdminUser(): User
     {
         return User::where('role', 'admin')->first()
