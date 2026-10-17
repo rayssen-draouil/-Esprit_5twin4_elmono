@@ -8,13 +8,29 @@
 @if($signalements->isNotEmpty())
 <section class="panel table-wrap" style="margin-bottom:2rem">
     <h2 style="padding:1.25rem 1.25rem 0">Signalements à vérifier</h2>
-    <table><thead><tr><th>Signalement</th><th>Type</th><th>Localisation</th><th>Photo</th><th>Créer l'incident</th></tr></thead><tbody>
+    <table><thead><tr><th>Signalement</th><th>Type</th><th>Localisation</th><th>Photo</th><th>Analyse IA</th><th>Créer l'incident</th></tr></thead><tbody>
     @foreach($signalements as $signalement)
         <tr>
             <td><strong>#{{ $signalement->id }}</strong><span>{{ $signalement->description }}</span></td>
             <td>{{ $signalement->type }}</td>
             <td>{{ $signalement->location }}</td>
             <td>@if($signalement->photo_path)<img class="incident-photo-thumb" src="{{ asset('storage/'.$signalement->photo_path) }}" alt="Photo du signalement #{{ $signalement->id }}">@else Aucune photo @endif</td>
+            <td>
+                @if($signalement->ai_analysis)
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span class="badge" style="background: #e6f6f3; color: var(--aqua); font-size: 11px;">
+                            Catégorie : {{ $signalement->ai_analysis['suggested_category_label'] ?? $signalement->type }}
+                        </span>
+                        <button class="button button-small button-outline" type="button" onclick="openReportAnalysisModal({{ json_encode($signalement) }})">
+                            ✨ Voir Diagnostic IA
+                        </button>
+                    </div>
+                @else
+                    <button class="button button-small" type="button" style="background: var(--deep); color: #fff;" onclick="triggerReportAnalysis({{ $signalement->id }}, this)">
+                        ⚡ Analyser avec l'IA
+                    </button>
+                @endif
+            </td>
             <td><form method="POST" action="{{ route('back.signalements.confirm', $signalement) }}">@csrf
                 <input name="description" value="{{ $signalement->description }}" aria-label="Description de l'incident">
                 <select name="severity"><option value="low">Faible</option><option value="medium" selected>Moyenne</option><option value="high">Élevée</option><option value="critical">Critique</option></select>
@@ -218,15 +234,259 @@ document.addEventListener('click', function(e) {
 // Close modal with Escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        const modals = document.querySelectorAll('.edit-modal');
+        const modals = document.querySelectorAll('.edit-modal, .intelligence-modal-backdrop');
         modals.forEach(modal => {
             if (modal.style.display === 'flex') {
-                const incidentId = modal.id.replace('edit-modal-', '');
-                closeEditModal(incidentId);
+                modal.style.display = 'none';
             }
         });
+        document.body.style.overflow = '';
     }
 });
+
+// =========================================================================
+// Feature 2: Smart Citizen Report Analyzer
+// =========================================================================
+let currentActiveReport = null;
+
+function triggerReportAnalysis(reportId, btn) {
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Analyse en cours...';
+
+    fetch('/admin/signalements/' + reportId + '/ai-analyze', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        }
+    })
+    .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Erreur lors de l\'analyse');
+        return data;
+    })
+    .then(data => {
+        window.location.reload();
+    })
+    .catch(err => {
+        alert(err.message || 'Erreur technique lors de l\'analyse du signalement.');
+        btn.disabled = false;
+        btn.textContent = origText;
+    });
+}
+
+function openReportAnalysisModal(signalement) {
+    currentActiveReport = signalement;
+    const a = signalement.ai_analysis;
+    if (!a) return;
+
+    document.getElementById('ai-report-modal-title').textContent = 'Signalement #' + signalement.id;
+    document.getElementById('ai-report-modal-subtitle').textContent = 'Signalé le ' + (signalement.reported_at ? new Date(signalement.reported_at).toLocaleString('fr-FR') : 'Date inconnue');
+    document.getElementById('ai-report-orig-type').textContent = signalement.type || 'Non spécifié';
+    document.getElementById('ai-report-orig-desc').textContent = signalement.description || '';
+    document.getElementById('ai-report-orig-loc').textContent = signalement.location || 'Non renseignée';
+
+    document.getElementById('ai-report-badge-category').textContent = 'Catégorie : ' + (a.suggested_category_label || a.suggested_category || 'Autre');
+    const badgeSev = document.getElementById('ai-report-badge-severity');
+    const sev = (a.suggested_severity || 'medium').toLowerCase();
+    badgeSev.textContent = 'Gravité : ' + sev.toUpperCase();
+    badgeSev.className = 'badge badge-' + (sev === 'critical' || sev === 'high' ? 'danger' : (sev === 'medium' ? 'warning' : 'neutral'));
+
+    document.getElementById('ai-report-summary').textContent = a.summary || '';
+    document.getElementById('ai-report-action').textContent = a.recommended_next_action || 'Vérification sur site.';
+    document.getElementById('ai-report-geo').textContent = a.location_details || 'Aucune précision géographique complémentaire.';
+    document.getElementById('ai-report-duplicate-reason').textContent = a.duplicate_reason || 'Aucun doublon détecté.';
+
+    // Populate edit dropdowns
+    const editType = document.getElementById('edit-signalement-type');
+    if (editType) editType.value = ucfirst(a.suggested_category || signalement.type || 'Autre');
+    const editPri = document.getElementById('edit-signalement-priority');
+    if (editPri) editPri.value = a.suggested_priority || signalement.priority || 'medium';
+
+    document.getElementById('modal-ai-report-analysis').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function ucfirst(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function closeReportAnalysisModal() {
+    document.getElementById('modal-ai-report-analysis').style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function acceptAiReportSuggestions() {
+    if (!currentActiveReport) return;
+    const btn = document.getElementById('btn-accept-report-suggestions');
+    btn.disabled = true;
+    btn.textContent = 'Validation...';
+
+    fetch('/admin/signalements/' + currentActiveReport.id + '/ai-accept', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        }
+    })
+    .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Erreur lors de la validation');
+        return data;
+    })
+    .then(data => {
+        window.location.reload();
+    })
+    .catch(err => {
+        alert(err.message || 'Erreur lors de la validation des suggestions.');
+        btn.disabled = false;
+        btn.textContent = '✓ Valider les suggestions IA';
+    });
+}
+
+function saveManualClassification() {
+    if (!currentActiveReport) return;
+    const type = document.getElementById('edit-signalement-type').value;
+    const priority = document.getElementById('edit-signalement-priority').value;
+
+    fetch('/admin/signalements/' + currentActiveReport.id + '/ai-edit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ type: type, priority: priority })
+    })
+    .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Erreur lors de la modification');
+        return data;
+    })
+    .then(data => {
+        window.location.reload();
+    })
+    .catch(err => {
+        alert(err.message || 'Erreur lors de l\'enregistrement.');
+    });
+}
+
+function reanalyzeCurrentReport() {
+    if (!currentActiveReport) return;
+    const btn = document.getElementById('btn-reanalyze-report');
+    btn.disabled = true;
+    btn.textContent = 'Analyse...';
+
+    triggerReportAnalysis(currentActiveReport.id, btn);
+}
 </script>
 @endpush
+
+{{-- Modal: Smart Citizen Report Analyzer --}}
+<div id="modal-ai-report-analysis" class="intelligence-modal-backdrop" style="display: none;" onclick="if(event.target === this) closeReportAnalysisModal()">
+    <div class="intelligence-modal-dialog" style="max-width: 720px; max-height: 88vh; background: #fff; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow: hidden; margin: auto;">
+        <div class="intelligence-modal-header" style="padding: 18px 24px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: flex-start; background: #fbfdfc; flex-shrink: 0;">
+            <div>
+                <span class="eyebrow" style="color: var(--aqua); font-size: 11px; font-weight: 800; letter-spacing: 0.1em;">ANALYSEUR INTELLIGENT DE SIGNALEMENT · IA</span>
+                <h2 id="ai-report-modal-title" style="margin: 4px 0 0; font-size: 20px; color: var(--deep);">Signalement #--</h2>
+                <small id="ai-report-modal-subtitle" style="color: var(--muted);"></small>
+            </div>
+            <button class="modal-close-btn" type="button" onclick="closeReportAnalysisModal()" style="border: 0; background: none; font-size: 20px; cursor: pointer;">✕</button>
+        </div>
+
+        <div class="intelligence-modal-body" style="padding: 20px 24px; overflow-y: auto; flex: 1;">
+            {{-- Original Citizen Declaration --}}
+            <div style="background: #fbfdfc; border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <strong style="font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em;">
+                        Texte original du citoyen (Inaltéré)
+                    </strong>
+                    <span class="badge badge-neutral" style="font-size: 10px;">Déclaré : <span id="ai-report-orig-type"></span></span>
+                </div>
+                <p id="ai-report-orig-desc" style="margin: 0; font-size: 13px; color: var(--ink); line-height: 1.5; font-style: italic;"></p>
+                <div style="margin-top: 6px; font-size: 11px; color: var(--muted);">
+                    📍 Localisation déclarée : <strong id="ai-report-orig-loc" style="color: var(--ink);"></strong>
+                </div>
+            </div>
+
+            {{-- AI Analysis Overview Banner --}}
+            <div style="background: linear-gradient(135deg, #eef9f7 0%, #e0f4f0 100%); border: 1px solid rgba(22, 183, 163, 0.3); border-radius: 6px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 11px; font-weight: 800; color: var(--aqua); letter-spacing: 0.05em;">SYNTHÈSE TECHNIQUE IA</span>
+                    <div style="display: flex; gap: 8px;">
+                        <span id="ai-report-badge-category" class="badge" style="background: #fff; color: var(--deep); font-weight: 700;"></span>
+                        <span id="ai-report-badge-severity" class="badge"></span>
+                    </div>
+                </div>
+                <p id="ai-report-summary" style="margin: 0; font-size: 13px; color: var(--ink); line-height: 1.5;"></p>
+            </div>
+
+            {{-- Recommendations & Location --}}
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                <div style="background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px;">
+                    <strong style="font-size: 11px; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;">Action recommandée</strong>
+                    <p id="ai-report-action" style="margin: 0; font-size: 12px; color: var(--ink); line-height: 1.4;"></p>
+                </div>
+                <div style="background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px;">
+                    <strong style="font-size: 11px; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;">Détails géographiques extraits</strong>
+                    <p id="ai-report-geo" style="margin: 0; font-size: 12px; color: var(--ink); line-height: 1.4;"></p>
+                </div>
+            </div>
+
+            {{-- Duplicate Detection Section --}}
+            <div id="ai-report-duplicate-box" style="border: 1px solid #fed7aa; background: #fffaf5; border-radius: 6px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <span style="font-size: 16px;">🔍</span>
+                    <strong style="font-size: 12px; color: #c2410c; text-transform: uppercase;">Détection de Doublons</strong>
+                </div>
+                <p id="ai-report-duplicate-reason" style="margin: 0; font-size: 12px; color: #9a3412; line-height: 1.4;"></p>
+            </div>
+
+            {{-- Edit Classification Form (collapsible) --}}
+            <details id="ai-report-edit-details" style="border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; background: #fff;">
+                <summary style="font-size: 12px; font-weight: 700; color: var(--deep); cursor: pointer;">
+                    ⚙ Ajuster manuellement la classification
+                </summary>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+                    <div>
+                        <label style="font-size: 11px; font-weight: 700; display: block; margin-bottom: 4px;">Catégorie</label>
+                        <select id="edit-signalement-type" style="width: 100%; padding: 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px;">
+                            <option value="Fuite">Fuite</option>
+                            <option value="Coupure">Coupure</option>
+                            <option value="Contamination">Contamination</option>
+                            <option value="Panne">Panne</option>
+                            <option value="Pression">Pression</option>
+                            <option value="Qualité">Qualité</option>
+                            <option value="Autre">Autre</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; font-weight: 700; display: block; margin-bottom: 4px;">Gravité</label>
+                        <select id="edit-signalement-priority" style="width: 100%; padding: 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px;">
+                            <option value="low">Faible</option>
+                            <option value="medium">Moyenne</option>
+                            <option value="high">Élevée</option>
+                            <option value="critical">Critique</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; text-align: right;">
+                    <button type="button" class="button button-small" onclick="saveManualClassification()">Enregistrer la modification</button>
+                </div>
+            </details>
+        </div>
+
+        <div class="intelligence-modal-footer" style="padding: 14px 24px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; background: #fbfdfc; flex-shrink: 0;">
+            <button class="button button-outline" type="button" onclick="closeReportAnalysisModal()">Fermer</button>
+            <button id="btn-reanalyze-report" class="button button-outline" type="button" onclick="reanalyzeCurrentReport()">🔄 Réanalyser</button>
+            <button id="btn-accept-report-suggestions" class="button button-primary" type="button" onclick="acceptAiReportSuggestions()">
+                ✓ Valider les suggestions IA
+            </button>
+        </div>
+    </div>
+</div>
 @endsection

@@ -1,0 +1,305 @@
+================================================================================
+DOSSIER TECHNIQUE ET FONCTIONNEL : GESTION DES INFRASTRUCTURES & MAINTENANCES
+PLATEFORME : AquaSecure (Système de Surveillance et Résilience Hydraulique)
+APPLICATION : Laravel 12 (PHP 8.2) / MySQL / Blade / JavaScript Vanilla
+================================================================================
+
+1. PRÉSENTATION GÉNÉRALE ET OBJECTIFS DU SYSTÈME
+--------------------------------------------------------------------------------
+AquaSecure est une plateforme web moderne dédiée au suivi, à la maintenance et à
+la sécurisation des infrastructures hydrauliques (stations de pompage, barrages,
+usines de filtration, réservoirs de stockage, canaux d'adduction, réseaux de
+capteurs de qualité).
+
+Le projet comporte deux volets intimement liés :
+  A. GESTION DES INFRASTRUCTURES HYDRAULIQUES : inventaire, géolocalisation,
+     cycle de vie, indice de santé en temps réel, criticité pour l'approvisionnement.
+  B. GESTION DES OPÉRATIONS DE MAINTENANCE : planification, suivi des interventions
+     curatives et préventives, gestion des équipes/techniciens, coûts, compte-rendu,
+     détection des retards et traitement des signalements usagers/citoyens.
+
+L'objectif de ce document est de décrire en profondeur les structures de données,
+les flux métiers, les règles de validation et les interactions actuelles afin
+d'alimenter une réflexion sur l'intégration de fonctionnalités d'Intelligence
+Artificielle (IA) novatrices et à forte valeur ajoutée.
+
+
+================================================================================
+2. MODÈLE DE DONNÉES ET ARCHITECTURE DES BASES
+================================================================================
+
+2.1 TABLE `infrastructures`
+----------------------------
+Représente chaque ouvrage ou installation physique du réseau d'eau.
+Champs :
+  - `id` : Clé primaire auto-incrémentée.
+  - `reference_code` : Identifiant unique normalisé (ex: INF-2026-001, INF-TUN-002).
+  - `name` : Nom de l'ouvrage (ex: Station de Traitement de Ghdir El Golla).
+  - `zone_id` : Clé étrangère vers la table `zones` (Bassin versant / District territorial).
+  - `type` : Catégorie d'infrastructure :
+      * 'Station de traitement d\'eau potable'
+      * 'Station de pompage'
+      * 'Barrage hydrotechnique'
+      * 'Usine de filtration'
+      * 'Réservoir de stockage'
+      * 'Canal d\'adduction & Transfert'
+      * 'Capteurs qualité'
+  - `location` : Adresse textuelle ou repère géographique (ex: Ghdir El Golla, Manouba).
+  - `latitude` / `longitude` : Coordonnées GPS décimales pour cartographie SIG.
+  - `capacity` : Capacité nominale (ex: 650 000 m³/jour, 580 millions m³).
+  - `status` : Statut opérationnel actuel :
+      * 'operational' (Opérationnel - Fonctionnement nominal)
+      * 'maintenance' (En cours de maintenance ou d'arrêt technique)
+      * 'critical' (État critique nécessitant une intervention immédiate)
+      * 'offline' / 'out_of_service' (Hors service / Inactif)
+  - `condition` : État d'usure physique du matériel :
+      * 'excellent', 'good' (Bon état), 'fair' (Passable), 'poor' (Dégradé), 'critical' (Critique)
+  - `criticality` : Niveau de criticité pour l'alimentation en eau :
+      * 'low' (Faible), 'medium' (Moyenne), 'high' (Élevée), 'vital' (Vitale - impact vital pour la population)
+  - `description` : Descriptif technique détaillé de l'ouvrage et de son rôle.
+  - `installation_date` : Date initiale d'installation physique.
+  - `commissioning_date` : Date officielle de mise en service dans le réseau.
+  - `last_maintenance_date` : Date de la dernière maintenance passée réussie.
+  - `next_maintenance_date` : Date prévisionnelle de la prochaine intervention.
+  - `image_path` : Chemin relatif de la photo de l'infrastructure (stockée sous storage/public).
+  - `created_at` / `updated_at` : Horodatages standards.
+
+Relations :
+  - `belongsTo(Zone::class)`
+  - `hasMany(Maintenance::class)` (trié par date décroissante)
+  - `hasMany(Incident::class)`
+
+Logique intelligente dérivée (Modèle Infrastructure) :
+  - `health_score` (Indicateur de Santé 0-100%) : Calculé dynamiquement selon la formule :
+      Score de base : operational = 90, maintenance = 65, critical/offline = 30
+      Modificateur état physique : excellent (+10), good (+5), fair (-10), poor (-25), critical (-45)
+      Pénalité de retard : -15 si `next_maintenance_date` est dépassée.
+      Résultat borné entre 5% et 100%.
+  - `health_label` : 'Excellent' (>=85), 'Bon état' (>=70), 'Surveillance' (>=50), 'Critique' (<50).
+  - `is_maintenance_due_soon` : Booléen vérifiant si une maintenance est prévue dans les 14 prochains jours.
+  - `is_maintenance_overdue` : Booléen vérifiant si la date planifiée est échue.
+  - `total_maintenance_cost` : Somme cumulative des coûts des opérations associées.
+
+
+2.2 TABLE `maintenances`
+-------------------------
+Représente chaque intervention technique préventive, corrective ou issue d'un signalement.
+Champs :
+  - `id` : Clé primaire auto-incrémentée.
+  - `reference_code` : Identifiant unique de l'intervention (ex: MNT-2026-001, MNT-2026-SIG-002).
+  - `infrastructure_id` : Clé étrangère vers `infrastructures`.
+  - `technician_id` : Clé étrangère nullable vers `techniciens`.
+  - `team` : Intitulé textuel de l'équipe d'intervention (ex: Brigade Mobile Pompage, Signalement usager).
+  - `type` : Catégorie d'opération :
+      * 'Préventive' (Révision périodique, graissage, étalonnage)
+      * 'Corrective' (Réparation de fuite, changement de clapet ou moteur)
+      * 'Inspection' (Audit structurel, auscultation géotechnique)
+      * 'Réglementaire' (Contrôle légal de sécurité ou qualité d'eau)
+      * 'Urgence' (Intervention d'urgence sur incident bloquant)
+  - `priority` : Priorité : 'low', 'medium', 'high', 'critical'.
+  - `status` : Statut du cycle de vie :
+      * 'reported' (Signalement citoyen / anomalie en attente de validation)
+      * 'planned' (Opération planifiée dans le calendrier)
+      * 'in_progress' (Équipe sur site, travaux en cours)
+      * 'completed' (Travaux terminés avec compte-rendu)
+      * 'cancelled' (Opération annulée)
+  - `scheduled_at` : Date et heure prévues pour l'opération.
+  - `started_at` : Date et heure réelles de démarrage sur site.
+  - `completed_at` / `performed_at` : Date et heure d'achèvement effectif.
+  - `cost` : Coût financier estimé ou facturé (en DT / €).
+  - `duration_hours` : Durée des travaux en heures (ex: 3.5 h).
+  - `description` : Cahier des charges, symptômes observés ou consignes d'intervention.
+  - `result` : Compte-rendu technique post-intervention (obligatoire à la clôture).
+  - `next_maintenance_date` : Préconisation de la date pour le prochain cycle.
+
+Relations :
+  - `belongsTo(Infrastructure::class)`
+  - `belongsTo(Technicien::class, 'technician_id')`
+
+Logique intelligente dérivée (Modèle Maintenance) :
+  - `is_overdue` : Détecte automatiquement si la maintenance est en retard (`scheduled_at < now()` et non terminée/annulée).
+  - `display_status` : Retourne 'reported', 'overdue', 'planned', 'in_progress', 'completed' ou 'cancelled'.
+  - `relative_time_message` : Message humanisé (ex: "Aujourd'hui à 14h00", "Dans 3 jours", "En retard de 5 j.").
+
+
+2.3 TABLES LIÉES
+-----------------
+  - `zones` : Découpage territorial (nom, adresse, description, risk_level).
+  - `techniciens` : Spécialistes de terrain (nom, email, téléphone, spécialité technique, statut : available/busy/on_leave).
+  - `incidents` : Incidents déclarés sur le réseau, liés aux infrastructures et aux zones.
+
+
+================================================================================
+3. FONCTIONNALITÉS EN DÉTAIL : GESTION DES INFRASTRUCTURES
+================================================================================
+
+3.1 BACK-OFFICE ADMINISTRATEUR (`/admin/infrastructures`)
+----------------------------------------------------------
+1. Tableau de bord & KPIs en temps réel :
+   - Total des infrastructures recensées.
+   - Nombre d'infrastructures 100% opérationnelles.
+   - Nombre d'infrastructures actuellement en maintenance.
+   - Nombre d'infrastructures en état critique ou hors service.
+   - Nombre d'infrastructures dont la maintenance est due sous 14 jours.
+
+2. Modes d'affichage commutables :
+   - Vue Table classique : Liste dense avec badges d'état, coordonnées GPS, jauge d'état, boutons d'action rapide.
+   - Vue Grille / Cartes interactives : Cartes visuelles avec photo, santé globale (health score), zone, date de dernière révision.
+
+3. Moteur de recherche et filtres multicritères avancés :
+   - Recherche globale full-text (nom, référence, localisation, type, description, nom de la zone).
+   - Filtre par Zone géographique / Bassin.
+   - Filtre par Type d'ouvrage.
+   - Filtre par État physique (condition) et Criticité (vital, high, medium, low).
+   - Onglets de filtrage rapide (Quick Filters) : Tous, Opérationnels, En maintenance, Critiques, Échéances proches.
+   - Tri dynamique sur colonnes : Nom, Code référence, Statut, État physique, Prochaine maintenance, Date de création.
+   - Puce de filtres actifs (Chips) avec suppression unitaire en 1 clic.
+
+4. Création et Édition d'Infrastructure :
+   - Génération automatique du code de référence `INF-YYYY-XXX` si laissé vide.
+   - Téléversement d'image avec redimensionnement et stockage sécurisé.
+   - Saisie assistée des coordonnées GPS (latitude / longitude).
+
+5. Fiche détaillée d'une infrastructure (`/admin/infrastructures/{id}`) :
+   - Carte d'identité complète : capacité, criticité, dates clés, localisation.
+   - Jauge circulaire ou barre dynamique de l'Indicateur de Santé (Health Score).
+   - Historique complet des maintenances réalisées et planifiées sur cet ouvrage spécifique.
+   - Statistiques financières : total des coûts de maintenance engagés sur l'ouvrage.
+   - Historique des incidents déclarés.
+
+3.2 FRONT-OFFICE PUBLIC / CITOYEN (`/infrastructures`)
+-------------------------------------------------------
+1. Portail public de transparence :
+   - Consultation citoyenne des grands équipements de l'eau (barrages, usines de potabilisation, stations).
+   - Filtres par statut (Opérationnel, Maintenance) et par zone.
+   - Pagination stylisée (AquaSecure custom pagination sans saut de page brutal).
+
+2. Fiche publique de l'ouvrage (`/infrastructures/{code}`) :
+   - Informations de capacité, mission d'intérêt général, état global du site.
+   - Historique des travaux récents pour rassurer le public sur la qualité de l'eau.
+   - Bouton d'action citoyenne : « Signaler une anomalie / panne sur cet ouvrage ».
+
+
+================================================================================
+4. FONCTIONNALITÉS EN DÉTAIL : GESTION DES MAINTENANCES
+================================================================================
+
+4.1 BACK-OFFICE ADMINISTRATEUR (`/admin/maintenances`)
+-------------------------------------------------------
+1. KPIs des opérations :
+   - Total des maintenances.
+   - Signalements usagers en attente de prise en charge (`reported`).
+   - Opérations planifiées à venir.
+   - Opérations actuellement en cours sur le terrain (`in_progress`).
+   - Opérations clôturées avec succès (`completed`).
+   - Alertes de retards (`overdue`).
+   - Volume des interventions du mois en cours.
+
+2. Cycle de vie et statuts d'une maintenance :
+   [ Signalement citoyen ] ---> (Validation Admin) ---> [ Planifiée ]
+                                                             |
+                                                       (Départ équipe)
+                                                             v
+                                                      [ En cours ]
+                                                             |
+                                                   (Clôture technique)
+                                                             v
+                                                      [ Terminée ]
+
+3. Synchronisation bidirectionnelle intelligente (Maintenance <-> Infrastructure) :
+   - Lorsqu'une maintenance bascule à `in_progress` : Le statut de l'infrastructure mère bascule automatiquement à `maintenance`.
+   - Lorsqu'une maintenance bascule à `completed` :
+     * La date de dernière maintenance de l'infrastructure (`last_maintenance_date`) est automatiquement mise à jour au jour de réalisation.
+     * Si l'infrastructure était en statut `maintenance`, elle est automatiquement remise en `operational`.
+     * La prochaine date recommandée (`next_maintenance_date`) est répercutée sur l'infrastructure.
+   - Validation en 1 clic d'un signalement (`maintenances.start`) :
+     * Assigne un technicien disponible.
+     * Marque la maintenance `in_progress` avec horodatage `started_at = now()`.
+     * Met l'infrastructure liée en statut `maintenance`.
+
+4. Vues Table et Calendrier / Chronologique :
+   - Vue Table : Liste filtrable par technicien, infrastructure, priorité, type et statut.
+   - Vue Calendrier / Timeline : Visualisation des interventions planifiées sur les 30 prochains jours pour éviter les goulots d'étranglement d'équipes.
+
+5. Validation et Clôture :
+   - Impossible de clôturer (`completed`) sans renseigner le compte-rendu technique `result`.
+   - Calcul des durées effectives et suivi des coûts engagés.
+
+
+================================================================================
+5. SYSTÈME DE SIGNALEMENT CITOYEN (COLLABORATION PUBLIQUE)
+================================================================================
+
+1. Modal de signalement direct depuis le site web public (`front.infrastructures.report`) :
+   - Tout citoyen peut signaler un dysfonctionnement constaté sur un ouvrage (ex: fuite sur conduite, coupure anormale, dégradation de clôture, eau boueuse).
+   - Champs :
+     * Type d'anomalie (Fuite ou rupture de canalisation, Écoulement anormal, Panne de surpression, etc.).
+     * Gravité perçue : Faible, Modérée, Critique (inondation / coupure totale).
+     * Nom du déclarant et Numéro de téléphone pour recontact rapide.
+     * Description précise des faits constatés.
+
+2. Impact immédiat sur le système :
+   - Création instantanée d'un ticket de maintenance sous la référence `MNT-YYYY-SIG-XXX`.
+   - Statut assigné : `reported` (Signalement usager en attente).
+   - Si la priorité signalée est `critical` : L'infrastructure bascule automatiquement en état de santé critique pour alerter les ingénieurs.
+
+
+================================================================================
+6. RÈGLES MÉTIER ET MOTEUR DE VALIDATION
+================================================================================
+
+6.1 RÈGLES DE VALIDATION CÔTÉ SERVEUR (FormRequests Laravel)
+-----------------------------------------------------------
+1. Cohérence chronologique des infrastructures :
+   - `installation_date` <= aujourd'hui.
+   - `commissioning_date` >= `installation_date`.
+   - `last_maintenance_date` >= `installation_date` et <= aujourd'hui.
+   - `next_maintenance_date` > `last_maintenance_date` et >= aujourd'hui.
+   - `name` : Obligation de contenir des caractères alphabétiques (rejet des noms purement numériques comme "123456").
+
+2. Cohérence chronologique des maintenances :
+   - Statut `planned` : `scheduled_at` doit impérativement être dans le futur ou aujourd'hui.
+   - Statut `completed` : Champ `result` (compte-rendu) obligatoire.
+   - `completed_at` >= `started_at`.
+   - `completed_at` et `started_at` <= heure actuelle (pas de travaux futurs déjà déclarés finis).
+   - `cost` >= 0, `duration_hours` entre 0.1h et 500h.
+   - `team` : Lettres, tirets et espaces uniquement.
+
+6.2 MOTEUR DE VALIDATION CÔTÉ CLIENT (`infra-validation.js`)
+------------------------------------------------------------
+- Attribut HTML5 `novalidate` actif sur tous les formulaires pour désactiver les bulles natives impersonnelles des navigateurs.
+- Validation interactive en temps réel à la saisie (`input`) et à la perte de focus (`blur`).
+- Messages d'aide contextualisés en français avec infobulles, icônes SVG d'erreur/succès et contours dynamiques des champs.
+- Empêchement de soumission avec scroll fluide vers le premier champ en anomalie.
+
+
+================================================================================
+7. LIMITES ACTUELLES ET OPPORTUNITÉS POUR L'INTELLIGENCE ARTIFICIELLE
+================================================================================
+
+Voici les limites et manques fonctionnels actuels du système, qui constituent
+d'excellents points d'entrée pour des fonctionnalités IA :
+
+1. Calcul de l'état de santé (Health Score) purement statique :
+   - Actuellement : Simple formule empirique avec additions/soustractions de points selon le statut et l'état visuel.
+   - Limite : Ne prédit aucune défaillance future et n'apprend pas des pannes antérieures.
+
+2. Planification des maintenances 100% manuelle :
+   - Actuellement : L'administrateur choisit lui-même une date et un technicien.
+   - Limite : Risque de sur-maintenance (coûts inutiles) ou de sous-maintenance (rupture de service), sans prise en compte des plannings optimaux de tournée ni de l'historique d'usure des pièces.
+
+3. Signalements citoyens non qualifiés automatiquement :
+   - Actuellement : Le citoyen tape un texte brut et déclare une priorité subjective.
+   - Limite : Risque de doublons multiples pour la même fuite, déclarations erronées, pas de vérification visuelle (pas d'analyse d'image transmise par le citoyen).
+
+4. Pas d'analyse prédictive des capteurs / télémétrie :
+   - Actuellement : Les seuils critiques sont surveillés ponctuellement sans modèle de détection d'anomalies sur les séries temporelles de pression/débit.
+
+5. Affectation des techniciens sous-optimale :
+   - Actuellement : Pas de routage géographique prédictif ni de recommandation intelligente selon la spécialité, l'outillage requis et la localisation géographique des équipes.
+
+6. Pas d'assistance conversationnelle :
+   - Ni pour le citoyen (pour l'aider à diagnostiquer un problème d'eau à son domicile ou quartier), ni pour le technicien sur le terrain (recherche vocale/chat dans la documentation technique des pompes/vannes).
+================================================================================
+FIN DU DOSSIER TECHNIQUE
+================================================================================

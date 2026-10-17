@@ -22,12 +22,20 @@ class Signalement extends Model
         'priority',
         'status',
         'reported_at',
+        'ai_analysis',
+        'ai_status',
+        'ai_reviewed_at',
+        'ai_reviewed_by',
+        'manager_category',
+        'manager_severity',
     ];
 
     protected function casts(): array
     {
         return [
             'reported_at' => 'datetime',
+            'ai_analysis' => 'array',
+            'ai_reviewed_at' => 'datetime',
         ];
     }
 
@@ -39,5 +47,10 @@ class Signalement extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'ai_reviewed_by');
     }
 }
