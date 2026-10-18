@@ -15,7 +15,7 @@ class FinancementController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Financement::with('project');
+        $query = Financement::with(['project', 'user']);
         $query->when($request->filled('status'), fn (Builder $builder) => $builder->where('status', $request->string('status')));
         $query->when($request->filled('project_id'), fn (Builder $builder) => $builder->where('project_id', $request->integer('project_id')));
         $query->when($request->filled('source'), fn (Builder $builder) => $builder->where('source', 'like', '%' . $request->string('source') . '%'));
@@ -46,14 +46,14 @@ class FinancementController extends Controller
 
     public function store(StoreFinancementRequest $request): RedirectResponse
     {
-        $financement = Financement::create($request->validated());
+        $financement = $request->user()->financements()->create($request->validated());
 
         return redirect()->route('financements.index')->with('success', 'Financement ajouté avec succès.');
     }
 
     public function show(Financement $financement): View
     {
-        return view('financements.show', ['financement' => $financement->load('project')]);
+        return view('financements.show', ['financement' => $financement->load(['project', 'user'])]);
     }
 
     public function edit(Financement $financement): View

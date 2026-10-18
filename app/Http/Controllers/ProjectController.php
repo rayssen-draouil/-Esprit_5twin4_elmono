@@ -15,7 +15,7 @@ class ProjectController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Project::withCount('financements')->with('financements');
+        $query = Project::withCount('financements')->with('user');
         $query->when($request->filled('search'), fn (Builder $builder) => $builder->where('name', 'like', '%' . $request->string('search') . '%'));
         $query->when($request->filled('status'), fn (Builder $builder) => $builder->where('status', $request->string('status')));
         $query->when($request->filled('type'), fn (Builder $builder) => $builder->where('type', $request->string('type')));
@@ -43,14 +43,14 @@ class ProjectController extends Controller
 
     public function store(StoreProjectRequest $request): RedirectResponse
     {
-        Project::create($request->validated());
+        $request->user()->projects()->create($request->validated());
 
         return redirect()->route('projects.index')->with('success', 'Projet créé avec succès.');
     }
 
     public function show(Project $project): View
     {
-        $project->load('financements');
+        $project->load(['user', 'financements.user']);
         $funded = (float) $project->financements->sum('amount');
         $budget = (float) $project->budget;
 
