@@ -1,8 +1,89 @@
 import './bootstrap';
 import './infra-validation';
 
-document.querySelector('.menu-toggle')?.addEventListener('click', () => {
-    document.querySelector('.site-header nav')?.classList.toggle('mobile-open');
+const navToggle = document.querySelector('[data-nav-toggle]');
+const siteNav = document.querySelector('[data-site-nav]');
+const navDropdown = document.querySelector('[data-nav-dropdown]');
+const navDropdownToggle = navDropdown?.querySelector('[data-nav-dropdown-toggle]');
+const navDropdownMenu = navDropdown?.querySelector('[data-nav-dropdown-menu]');
+const mobileNavQuery = window.matchMedia('(max-width: 1024px)');
+
+const setDropdownOpen = (open) => {
+    if (!navDropdown || !navDropdownToggle || !navDropdownMenu) return;
+    navDropdown.classList.toggle('is-open', open);
+    navDropdownToggle.setAttribute('aria-expanded', String(open));
+    navDropdownMenu.hidden = !open;
+};
+
+const setNavOpen = (open) => {
+    if (!siteNav || !navToggle) return;
+    siteNav.classList.toggle('is-open', open);
+    navToggle.setAttribute('aria-expanded', String(open));
+    navToggle.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
+    if (open && mobileNavQuery.matches) {
+        siteNav.querySelector('a, button')?.focus();
+    }
+    if (!open) setDropdownOpen(false);
+};
+
+navToggle?.addEventListener('click', () => {
+    setNavOpen(navToggle.getAttribute('aria-expanded') !== 'true');
+});
+
+navDropdownToggle?.addEventListener('click', () => {
+    setDropdownOpen(navDropdownToggle.getAttribute('aria-expanded') !== 'true');
+});
+
+navDropdownToggle?.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    setDropdownOpen(true);
+    const items = [...navDropdownMenu.querySelectorAll('a')];
+    items[event.key === 'ArrowDown' ? 0 : items.length - 1]?.focus();
+});
+
+navDropdownMenu?.addEventListener('keydown', (event) => {
+    const items = [...navDropdownMenu.querySelectorAll('a')];
+    const index = items.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const next = event.key === 'ArrowDown' ? index + 1 : index - 1;
+        items[(next + items.length) % items.length]?.focus();
+    } else if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        items[event.key === 'Home' ? 0 : items.length - 1]?.focus();
+    } else if (event.key === 'Escape') {
+        event.preventDefault();
+        setDropdownOpen(false);
+        navDropdownToggle?.focus();
+    }
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (navDropdown?.classList.contains('is-open')) {
+        setDropdownOpen(false);
+        navDropdownToggle?.focus();
+    } else if (siteNav?.classList.contains('is-open')) {
+        setNavOpen(false);
+        navToggle?.focus();
+    }
+});
+
+document.addEventListener('click', (event) => {
+    if (navDropdown && !navDropdown.contains(event.target)) setDropdownOpen(false);
+});
+
+navDropdown?.addEventListener('focusout', (event) => {
+    if (!navDropdown.contains(event.relatedTarget)) setDropdownOpen(false);
+});
+
+mobileNavQuery.addEventListener('change', (event) => {
+    if (!event.matches) setNavOpen(false);
+});
+
+siteNav?.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => setNavOpen(false));
 });
 document.querySelector('#incident-photo')?.addEventListener('change', (event) => {
     const input = event.currentTarget;

@@ -52,6 +52,17 @@
                 <input name="location" type="text" data-label="Localisation" data-rules="required|min:3|max:255" value="{{ old('location') }}" placeholder="Adresse, commune ou infrastructure">
                 @error('location')<small class="field-error">{{ $message }}</small>@enderror
             </label>
+            <label>Zone concernée (facultatif)
+                <select name="zone_id">
+                    <option value="">Je ne sais pas</option>
+                    @foreach($zones as $zone)
+                        <option value="{{ $zone->id }}" @selected((string) old('zone_id', request('zone_id')) === (string) $zone->id)>
+                            {{ $zone->name }}{{ $zone->address ? ' — '.$zone->address : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('zone_id')<small class="field-error">{{ $message }}</small>@enderror
+            </label>
             <fieldset class="signalement-type signalement-severity">
                 <legend>Niveau de gravité</legend>
                 <label class="signalement-option" for="severity-low">

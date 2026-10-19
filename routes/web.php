@@ -1,14 +1,18 @@
 <?php
 
+use App\Http\Controllers\Back\AiChatController;
 use App\Http\Controllers\Back\AiIntelligenceSuiteController;
+use App\Http\Controllers\Back\AlertAiController;
 use App\Http\Controllers\Back\AlertController;
 use App\Http\Controllers\Back\BackController;
 use App\Http\Controllers\Back\MaintenanceIntelligenceController;
+use App\Http\Controllers\Back\ZoneAiController;
 use App\Http\Controllers\Back\ZoneController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinancementController;
 use App\Http\Controllers\Front\FrontController;
+use App\Http\Controllers\Front\PublicZoneAlertController;
 use App\Http\Controllers\InfrastructureController;
 use App\Http\Controllers\InterventionController;
 use App\Http\Controllers\MaintenanceController;
@@ -41,6 +45,22 @@ Route::get('/services', [FrontController::class, 'services'])->name('front.servi
 Route::get('/zones', [FrontController::class, 'zones'])->name('front.zones.index');
 Route::get('/alerts', [FrontController::class, 'alerts'])->name('front.alerts.index');
 Route::get('/alertes', [FrontController::class, 'alerts']);
+
+// Pages et endpoints publics (citoyens) des zones et alertes.
+// Les routes statiques DOIVENT précéder {zone} / {alert}.
+Route::get('/zones/map-data', [PublicZoneAlertController::class, 'mapData'])->middleware('throttle:60,1')->name('front.zones.map-data');
+Route::get('/zones/nearest', [PublicZoneAlertController::class, 'nearest'])->middleware('throttle:60,1')->name('front.zones.nearest');
+Route::get('/zones/{zone}', [PublicZoneAlertController::class, 'showZone'])->name('front.zones.show');
+Route::get('/alerts/live', [PublicZoneAlertController::class, 'live'])->middleware('throttle:60,1')->name('front.alerts.live');
+Route::get('/alerts/{alert}', [PublicZoneAlertController::class, 'showAlert'])->name('front.alerts.show');
+Route::get('/suivi', [PublicZoneAlertController::class, 'trackReport'])->name('front.track');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/mes-zones', [PublicZoneAlertController::class, 'subscriptions'])->name('front.zones.subscriptions');
+    Route::post('/mes-zones/{zone}', [PublicZoneAlertController::class, 'subscribe'])->name('front.zones.subscribe');
+    Route::delete('/mes-zones/{zone}', [PublicZoneAlertController::class, 'unsubscribe'])->name('front.zones.unsubscribe');
+});
+
 Route::middleware('auth')->group(function () {
     Route::get('/incidents', [FrontController::class, 'incidents'])->name('front.incidents.index');
     Route::get('/incidents/create', [FrontController::class, 'createIncident'])->name('front.incidents.create');
@@ -69,8 +89,36 @@ Route::middleware(['auth', 'role:admin,manager,gestionnaire'])->prefix('back')->
     Route::get('/projects', [BackController::class, 'projects'])->name('projects');
     Route::get('/funding', [BackController::class, 'funding'])->name('funding');
     Route::get('/users', [BackController::class, 'users'])->name('users');
+
+    // Routes statiques des zones et alertes. Elles DOIVENT précéder les
+    // Route::resource() : sinon /zones/export ou /alerts/live serait avalé
+    // par la liaison implicite {zone} / {alert}.
+    Route::get('/zones/map-data', [ZoneController::class, 'mapData'])->name('zones.map-data');
+    Route::get('/zones/export', [ZoneController::class, 'export'])->name('zones.export');
+    Route::get('/alerts/export', [AlertController::class, 'export'])->name('alerts.export');
+    Route::get('/alerts/live', [AlertController::class, 'live'])->middleware('throttle:120,1')->name('alerts.live');
+    Route::post('/alerts/bulk', [AlertController::class, 'bulk'])->name('alerts.bulk');
+
     Route::resource('zones', ZoneController::class);
     Route::resource('alerts', AlertController::class);
+
+    // Workflow de traitement des alertes (additif, colonnes NULLABLE).
+    Route::post('/alerts/{alert}/acknowledge', [AlertController::class, 'acknowledge'])->name('alerts.acknowledge');
+    Route::post('/alerts/{alert}/resolve', [AlertController::class, 'resolve'])->name('alerts.resolve');
+    Route::post('/alerts/{alert}/reopen', [AlertController::class, 'reopen'])->name('alerts.reopen');
+
+    // AquaSecure AI — intelligence des zones et des alertes (additif, throttle API IA)
+    Route::post('/zones/{zone}/ai-analyze', [ZoneAiController::class, 'analyze'])->middleware('throttle:20,1')->name('zones.ai-analyze');
+    Route::get('/zones/{zone}/ai-analysis', [ZoneAiController::class, 'analysis'])->name('zones.get-ai-analysis');
+    Route::post('/alerts/{alert}/ai-analyze', [AlertAiController::class, 'analyze'])->middleware('throttle:20,1')->name('alerts.ai-analyze');
+    Route::get('/alerts/{alert}/ai-analysis', [AlertAiController::class, 'analysis'])->name('alerts.get-ai-analysis');
+});
+
+// AquaSecure AI — assistant conversationnel (lecture seule, zones + alertes).
+// Groupe distinct du back.* : le rôle technician est autorisé sans entrer dans le back-office.
+Route::middleware(['auth', 'role:admin,manager,gestionnaire,technician'])->prefix('back')->name('back.')->group(function () {
+    Route::post('/ai/chat', [AiChatController::class, 'chat'])->middleware('throttle:15,1')->name('ai.chat');
+    Route::get('/ai/chat/status', [AiChatController::class, 'status'])->middleware('throttle:30,1')->name('ai.chat.status');
 });
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
