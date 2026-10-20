@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Exceptions\GroqAiException;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
-use App\Models\Technicien;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +17,11 @@ class TechnicianRecommendationService
     ) {}
 
     /**
-     * Recommend the top 3 best eligible technicians for a maintenance operation.
+     * Recommend the best technicians for a maintenance operation.
+     *
+     * L'IA classe les meilleurs candidats ; l'ensemble de l'effectif
+     * technicien est néanmoins restitué afin que le manager puisse affecter
+     * n'importe quel technicien de l'équipe.
      *
      * @param array $taskDetails
      * @return array
@@ -37,14 +41,16 @@ class TechnicianRecommendationService
         $infraType = $taskDetails['infrastructure_type'] ?? ($maintenance?->infrastructure?->type ?? 'Réseau');
         $zoneName = $taskDetails['zone_name'] ?? ($maintenance?->infrastructure?->zone?->name ?? 'Zone d\'exploitation');
 
-        // 2. Fetch candidates with hard constraints
+        // 2. Fetch the whole technician workforce
         $candidates = $this->getEligibleCandidates($type, $infraType);
+        $assignable = $candidates->where('selectable', true)->values();
 
-        if ($candidates->isEmpty()) {
+        if ($assignable->isEmpty()) {
             return [
                 'maintenance_id' => $maintenance?->id,
                 'candidate_rankings' => [],
-                'no_suitable_candidate_reason' => 'Aucun technicien éligible n\'est actuellement disponible dans l\'effectif actif pour ce type d\'opération.',
+                'all_candidates' => $candidates->toArray(),
+                'no_suitable_candidate_reason' => 'Aucun technicien actif n\'est actuellement disponible pour une affectation.',
                 'task_context' => [
                     'type' => $type,
                     'priority' => $priority,
@@ -58,7 +64,7 @@ class TechnicianRecommendationService
         // 3. Call Groq AI or fallback
         if ($this->groqService->isConfigured()) {
             try {
-                $rawAi = $this->callGroqMatchmaker($candidates, [
+                $rawAi = $this->callGroqMatchmaker($assignable, [
                     'type' => $type,
                     'priority' => $priority,
                     'infrastructure' => $infraName,
@@ -67,7 +73,7 @@ class TechnicianRecommendationService
                     'description' => substr((string) $description, 0, 300),
                 ]);
 
-                return $this->validateAndNormalizeRankings($rawAi, $candidates, $maintenance?->id);
+                return $this->validateAndNormalizeRankings($rawAi, $assignable, $maintenance?->id, $candidates);
             } catch (\Throwable $e) {
                 Log::warning('Groq technician recommendation failed, falling back to deterministic ranking', [
                     'error' => $e->getMessage(),
@@ -75,37 +81,40 @@ class TechnicianRecommendationService
             }
         }
 
-        return $this->generateDeterministicRankings($candidates, $type, $maintenance?->id);
+        return $this->generateDeterministicRankings($assignable, $type, $maintenance?->id, $candidates);
     }
 
     /**
-     * Retrieve eligible candidates applying database and business constraints.
+     * Retrieve the technician workforce with workload and compatibility data.
+     *
+     * Tous les techniciens sont retournés : l'IA ne classe qu'une sélection,
+     * mais le manager doit pouvoir affecter n'importe quel membre de l'équipe.
      */
     public function getEligibleCandidates(string $maintType, string $infraType): Collection
     {
-        $technicians = Technicien::withCount([
+        $technicians = User::technicians()->withCount([
             'maintenances as active_maintenances_count' => fn ($q) => $q->whereIn('status', ['planned', 'in_progress']),
         ])
-        ->where('status', '!=', 'inactive')
         ->get();
 
         return $technicians->map(function ($tech) use ($maintType, $infraType) {
             $speciality = (string) $tech->speciality;
             $matchScore = $this->calculateSpecialtyCompatibility($speciality, $maintType, $infraType);
+            $status = $tech->status ?: 'available';
 
             return [
                 'id' => $tech->id,
                 'name' => $tech->name,
                 'speciality' => $speciality ?: 'Maintenance générale',
-                'status' => $tech->status ?? 'available',
+                'status' => $status,
                 'active_workload' => $tech->active_maintenances_count,
                 'compatibility_score' => $matchScore,
+                'selectable' => $status !== 'inactive',
             ];
         })
         ->sortByDesc('compatibility_score')
         ->sortBy('active_workload')
-        ->values()
-        ->take(6);
+        ->values();
     }
 
     /**
@@ -113,28 +122,74 @@ class TechnicianRecommendationService
      */
     protected function calculateSpecialtyCompatibility(string $speciality, string $maintType, string $infraType): int
     {
-        $spec = strtolower($speciality);
-        $type = strtolower($maintType);
-        $infra = strtolower($infraType);
+        $spec = mb_strtolower($speciality);
+        $type = mb_strtolower($maintType);
+        $infra = mb_strtolower($infraType);
 
         $score = 50; // base score for general maintenance
 
-        if (str_contains($infra, 'pompe') || str_contains($infra, 'station')) {
-            if (str_contains($spec, 'électromécanique') || str_contains($spec, 'pompage') || str_contains($spec, 'moteur')) $score += 40;
-            elseif (str_contains($spec, 'hydraulique')) $score += 25;
+        $matches = function (array $needles) use ($spec) {
+            foreach ($needles as $needle) {
+                if (str_contains($spec, $needle)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        // Électromécanique, pompage, groupes motopompes
+        if (str_contains($infra, 'pompage') || str_contains($infra, 'moteur') || str_contains($infra, 'station')) {
+            if ($matches(['électromécanique', 'pompage', 'moteur', 'motopompe'])) {
+                $score += 25;
+            } elseif ($matches(['hydraulique', 'mécanique'])) {
+                $score += 15;
+            }
         }
 
-        if (str_contains($infra, 'canalisation') || str_contains($infra, 'réseau') || str_contains($infra, 'conduite')) {
-            if (str_contains($spec, 'réseau') || str_contains($spec, 'canalisation') || str_contains($spec, 'fuite')) $score += 40;
-            elseif (str_contains($spec, 'hydraulique')) $score += 30;
+        // Réseaux de distribution, canalisations, détection de fuites
+        if (str_contains($infra, 'réseau') || str_contains($infra, 'distribution') || str_contains($infra, 'canalisation') || str_contains($infra, 'conduite') || str_contains($infra, 'fuite')) {
+            if ($matches(['réseau', 'distribution', 'canalisation', 'fuite'])) {
+                $score += 25;
+            } elseif ($matches(['hydraulique'])) {
+                $score += 15;
+            }
         }
 
-        if (str_contains($infra, 'traitement') || str_contains($infra, 'filtration') || str_contains($infra, 'qualité')) {
-            if (str_contains($spec, 'chimie') || str_contains($spec, 'traitement') || str_contains($spec, 'filtration') || str_contains($spec, 'qualité')) $score += 45;
+        // Traitement, filtration, potabilisation, qualité de l'eau
+        if (str_contains($infra, 'traitement') || str_contains($infra, 'filtration') || str_contains($infra, 'potable') || str_contains($infra, 'qualité') || str_contains($infra, 'chloration')) {
+            if ($matches(['traitement', 'filtration', 'qualité', 'chimie', 'potabilisation'])) {
+                $score += 25;
+            } elseif ($matches(['automatisme', 'scada', 'télémétrie', 'instrumentation'])) {
+                $score += 18;
+            }
+        }
+
+        // Dessalement et osmose inverse
+        if (str_contains($infra, 'dessalement') || str_contains($infra, 'osmose') || str_contains($infra, 'membrane')) {
+            if ($matches(['dessalement', 'osmose', 'membrane'])) {
+                $score += 30;
+            }
+        }
+
+        // Automatisation et supervision (transversal aux sites de production)
+        if ($matches(['scada', 'automatisme', 'télémétrie', 'supervision', 'instrumentation'])) {
+            if (str_contains($infra, 'station') || str_contains($infra, 'traitement') || str_contains($infra, 'réservoir')) {
+                $score += 10;
+            }
+        }
+
+        // Génie civil et auscultation d'ouvrages
+        if (str_contains($infra, 'barrage') || str_contains($infra, 'ouvrage') || str_contains($infra, 'génie civil') || str_contains($infra, 'réservoir')) {
+            if ($matches(['génie civil', 'auscultation', 'barrage', 'ouvrage', 'fondation'])) {
+                $score += 30;
+            }
         }
 
         if ($type === 'urgence') {
-            if (str_contains($spec, 'urgence') || str_contains($spec, 'dépannage')) $score += 20;
+            if ($matches(['urgence', 'dépannage', 'astreinte'])) {
+                $score += 10;
+            }
         }
 
         return min(100, $score);
@@ -186,7 +241,7 @@ PROMPT;
     /**
      * Validate and normalize the rankings returned by AI.
      */
-    protected function validateAndNormalizeRankings(array $raw, Collection $candidates, ?int $maintenanceId): array
+    protected function validateAndNormalizeRankings(array $raw, Collection $candidates, ?int $maintenanceId, ?Collection $allCandidates = null): array
     {
         $rawRankings = is_array($raw['candidate_rankings'] ?? null) ? $raw['candidate_rankings'] : [];
         $candidatesById = $candidates->keyBy('id');
@@ -221,12 +276,13 @@ PROMPT;
         }
 
         if (empty($validRankings)) {
-            return $this->generateDeterministicRankings($candidates, 'Générale', $maintenanceId);
+            return $this->generateDeterministicRankings($candidates, 'Générale', $maintenanceId, $allCandidates);
         }
 
         return [
             'maintenance_id' => $maintenanceId,
             'candidate_rankings' => $validRankings,
+            'all_candidates' => ($allCandidates ?? $candidates)->values()->toArray(),
             'no_suitable_candidate_reason' => null,
             'is_ai_generated' => true,
         ];
@@ -235,7 +291,7 @@ PROMPT;
     /**
      * Deterministic rankings fallback.
      */
-    public function generateDeterministicRankings(Collection $candidates, string $maintType, ?int $maintenanceId): array
+    public function generateDeterministicRankings(Collection $candidates, string $maintType, ?int $maintenanceId, ?Collection $allCandidates = null): array
     {
         $rankings = [];
         $rank = 1;
@@ -266,6 +322,7 @@ PROMPT;
         return [
             'maintenance_id' => $maintenanceId,
             'candidate_rankings' => $rankings,
+            'all_candidates' => ($allCandidates ?? $candidates)->values()->toArray(),
             'no_suitable_candidate_reason' => empty($rankings) ? 'Aucun technicien compatible n\'a été trouvé.' : null,
             'is_ai_generated' => false,
         ];
@@ -278,7 +335,7 @@ PROMPT;
     {
         return DB::transaction(function () use ($maintenanceId, $technicianId) {
             $maintenance = Maintenance::lockForUpdate()->findOrFail($maintenanceId);
-            $technician = Technicien::lockForUpdate()->findOrFail($technicianId);
+            $technician = User::technicians()->lockForUpdate()->findOrFail($technicianId);
 
             if ($technician->status === 'inactive') {
                 throw new \InvalidArgumentException("Le technicien sélectionné est inactif et ne peut pas être affecté.");

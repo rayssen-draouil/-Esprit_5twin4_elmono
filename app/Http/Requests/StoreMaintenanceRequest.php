@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreMaintenanceRequest extends FormRequest
@@ -17,7 +18,7 @@ class StoreMaintenanceRequest extends FormRequest
         return [
             'infrastructure_id' => ['required', 'integer', 'exists:infrastructures,id'],
             'reference_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9\-_]+$/i', 'unique:maintenances,reference_code'],
-            'technician_id' => ['nullable', 'integer', 'exists:techniciens,id'],
+            'technician_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('role', 'technician')],
             'team' => ['nullable', 'string', 'max:255', 'regex:/^[\p{L}\s\-\'.]+$/u'],
             'type' => ['required', 'string', 'max:100'],
             'priority' => ['required', 'in:low,medium,high,critical'],

@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
-use App\Models\Technicien;
 use App\Models\User;
 use App\Models\Zone;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,8 +18,8 @@ class TechnicianAssignmentLifecycleTest extends TestCase
     protected User $manager;
     protected User $technicianUser;
     protected User $citizen;
-    protected Technicien $technician;
-    protected Technicien $technician2;
+    protected User $technician;
+    protected User $technician2;
     protected Zone $zone;
     protected Infrastructure $infrastructure;
     protected Maintenance $maintenance;
@@ -34,28 +33,27 @@ class TechnicianAssignmentLifecycleTest extends TestCase
             'email' => 'manager@aquasecure.fr',
         ]);
 
-        $this->technicianUser = User::factory()->create([
-            'role' => 'technician',
-            'email' => 'sarah.petit@aquasecure.fr',
-        ]);
-
         $this->citizen = User::factory()->create([
             'role' => 'citizen',
             'email' => 'citoyen@aquasecure.fr',
         ]);
 
-        $this->technician = Technicien::create([
-            'user_id' => $this->technicianUser->id,
-            'name' => 'Sarah Petit',
+        // Le technicien est un rôle applicatif : il s'agit du compte utilisateur.
+        $this->technician = User::factory()->create([
+            'role' => 'technician',
             'email' => 'sarah.petit@aquasecure.fr',
+            'name' => 'Sarah Petit',
             'phone' => '+33 4 72 00 11 22',
             'speciality' => 'Capteurs & Télémétrie',
             'status' => 'available',
         ]);
 
-        $this->technician2 = Technicien::create([
-            'name' => 'Marc Lemoine',
+        $this->technicianUser = $this->technician;
+
+        $this->technician2 = User::factory()->create([
+            'role' => 'technician',
             'email' => 'marc.lemoine@aquasecure.fr',
+            'name' => 'Marc Lemoine',
             'phone' => '+33 5 56 00 22 33',
             'speciality' => 'Génie Civil',
             'status' => 'available',

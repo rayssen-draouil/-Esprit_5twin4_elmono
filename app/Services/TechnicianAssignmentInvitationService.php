@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
-use App\Models\Technicien;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -36,7 +36,7 @@ class TechnicianAssignmentInvitationService
     ): array {
         return DB::transaction(function () use ($maintenanceId, $technicianId, $managerId, $expiresInHours) {
             $maintenance = Maintenance::with(['infrastructure.zone', 'technician'])->lockForUpdate()->findOrFail($maintenanceId);
-            $technician = Technicien::lockForUpdate()->findOrFail($technicianId);
+            $technician = User::technicians()->lockForUpdate()->findOrFail($technicianId);
 
             // 1. Validate maintenance state
             if ($maintenance->technician_assignment_locked) {
@@ -237,7 +237,7 @@ class TechnicianAssignmentInvitationService
             }
 
             $maintenance = Maintenance::with('infrastructure')->lockForUpdate()->findOrFail($invitation->maintenance_id);
-            $technician = Technicien::lockForUpdate()->findOrFail($invitation->technician_id);
+            $technician = User::technicians()->lockForUpdate()->findOrFail($invitation->technician_id);
 
             // Verify maintenance is not already locked with another technician
             if ($maintenance->technician_assignment_locked && (int) $maintenance->technician_id !== (int) $technician->id) {

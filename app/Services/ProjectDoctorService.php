@@ -35,6 +35,43 @@ class ProjectDoctorService
 
     protected const MAX_MESSAGE_LENGTH = 2000;
 
+    /**
+     * Champs narratifs (texte) acceptés dans la charge utile IA.
+     *
+     * @var list<string>
+     */
+    protected const AI_TEXT_FIELDS = ['synthese', 'reponse', 'limite'];
+
+    /**
+     * Champs narratifs (liste) acceptés dans la charge utile IA.
+     *
+     * @var list<string>
+     */
+    protected const AI_LIST_FIELDS = [
+        'hypotheses',
+        'recommandations',
+        'actions_recommandees',
+        'causes_possibles',
+        'informations_manquantes',
+        'limites',
+        'alertes',
+    ];
+
+    /**
+     * Longueur maximale d'un champ narratif unique.
+     */
+    protected const AI_TEXT_MAX_LENGTH = 1500;
+
+    /**
+     * Longueur maximale d'un élément de liste narrative.
+     */
+    protected const AI_ITEM_MAX_LENGTH = 400;
+
+    /**
+     * Nombre maximal d'éléments par liste narrative.
+     */
+    protected const AI_LIST_MAX_ITEMS = 8;
+
     public function __construct(protected GeminiAiService $ai) {}
 
     public function aiIsConfigured(): bool
@@ -418,6 +455,7 @@ class ProjectDoctorService
                     'type' => $target->type,
                 ],
                 'est_pi_ia' => $answer['ai_generated'],
+                'ia' => $answer['ia'] ?? [],
                 'disclaimer' => 'Ces estimations sont indicatives et ne constituent pas une source de vérité financière.',
             ]),
             'sources' => $sources,
@@ -449,6 +487,7 @@ class ProjectDoctorService
                     'type' => $target->type,
                 ],
                 'est_pi_ia' => $answer['ai_generated'],
+                'ia' => $answer['ia'] ?? [],
                 'disclaimer' => 'L\'estimation de retard est indicative et fondée sur les dates et la progression déclarées.',
             ]),
             'sources' => $sources,
@@ -481,6 +520,7 @@ class ProjectDoctorService
                     'type' => $target->type,
                 ],
                 'est_pi_ia' => $answer['ai_generated'],
+                'ia' => $answer['ia'] ?? [],
                 'disclaimer' => 'Le besoin de financement est une estimation basée sur les financements confirmés uniquement.',
             ]),
             'sources' => $sources,
@@ -534,7 +574,7 @@ class ProjectDoctorService
             'success' => true,
             'intent' => self::INTENT_PROJECT_OVERVIEW,
             'answer' => $answer['text'],
-            'data' => array_merge($context, ['est_pi_ia' => $answer['ai_generated']]),
+            'data' => array_merge($context, ['est_pi_ia' => $answer['ai_generated'], 'ia' => $answer['ia'] ?? []]),
             'sources' => $items ? array_column($items, 'id') : [],
             'disclaimer' => 'Vue d\'automne indicative des projets auxquels vous avez accès.',
         ];
@@ -560,7 +600,11 @@ class ProjectDoctorService
             'success' => true,
             'intent' => self::INTENT_GENERAL_QUESTION,
             'answer' => $answer['text'],
-            'data' => ['est_pi_ia' => $answer['ai_generated'], 'focus_project_id' => $focusProject?->id],
+            'data' => [
+                'est_pi_ia' => $answer['ai_generated'],
+                'focus_project_id' => $focusProject?->id,
+                'ia' => $answer['ia'] ?? [],
+            ],
             'sources' => $focusProject ? [$focusProject->id] : array_column($context['accessible_projects'], 'id'),
             'disclaimer' => 'Réponse générée par l\'IA à partir des données projets autorisées.',
         ];
@@ -621,6 +665,7 @@ class ProjectDoctorService
             return [
                 'text' => $this->deterministicText($intent, $deterministic, $context),
                 'ai_generated' => false,
+                'ia' => $this->deterministicNarrative($intent, $deterministic),
                 'disclaimer' => $disclaimerBase.' Service Gemini non configuré : analyse déterministe uniquement.',
             ];
         }
@@ -643,6 +688,7 @@ class ProjectDoctorService
                 return [
                     'text' => $normalized['text'],
                     'ai_generated' => true,
+                    'ia' => $normalized['ia'],
                     'disclaimer' => $disclaimerBase,
                 ];
             }
@@ -651,6 +697,7 @@ class ProjectDoctorService
             return [
                 'text' => $raw."\n\n".$this->deterministicText($intent, $deterministic, $context),
                 'ai_generated' => true,
+                'ia' => [],
                 'disclaimer' => $disclaimerBase,
             ];
         } catch (GeminiAiException $e) {
@@ -663,6 +710,7 @@ class ProjectDoctorService
             return [
                 'text' => $this->deterministicText($intent, $deterministic, $context),
                 'ai_generated' => false,
+                'ia' => $this->deterministicNarrative($intent, $deterministic),
                 'disclaimer' => $disclaimerBase.' '.$e->getUserFriendlyMessage(),
             ];
         }
@@ -682,7 +730,8 @@ RÈGLES STRICTES :
 5. Ne confondez pas un financement approuvé avec de l'argent effectivement reçu sans donnée de décaissement.
 6. Si des données sont manquantes, signalez-le explicitement et fournissez une estimation indicative avec ses limites.
 7. N'essayez jamais d'exécuter du SQL, des commandes ou des opérations administratives. Vous analysez uniquement.
-8. Retournez STRICTEMENT un objet JSON valide, sans balisage markdown, sans texte avant ou après.
+8. Ne citez AUCUN montant, pourcentage, date, durée ou compteur dans la synthèse et les commentaires : ces valeurs sont calculées par le serveur et affichées séparément. Rédigez une analyse qualitative qui ne contredit pas les données déterministes fournies. Les champs numériques du schéma peuvent rester à null : le serveur les remplace par ses propres calculs.
+9. Retournez STRICTEMENT un objet JSON valide, sans balisage markdown, sans texte avant ou après.
 PROMPT;
 
         $cost = <<<'PROMPT'
@@ -806,18 +855,237 @@ PROMPT;
         return $decoded;
     }
 
+    /**
+     * Ne conserve que les champs narratifs utiles et les assainit.
+     *
+     * Les valeurs numériques produites par l'IA sont volontairement ignorées :
+     * les chiffres affichés proviennent exclusivement des calculs déterministes
+     * effectués côté serveur, afin d'éviter toute hallucination chiffrée.
+     */
     protected function normalizeAiAnswer(string $intent, array $raw, array $deterministic): array
     {
-        $text = (string) ($raw['synthese'] ?? $raw['reponse'] ?? 'Analyse réalisée.');
-        if ($text === '') {
+        $narrative = $this->buildAiNarrative($intent, $raw);
+
+        $text = $narrative['synthese'] ?? null;
+
+        if ($text === null || $text === '') {
             $text = $this->deterministicText($intent, $deterministic, []);
         }
 
-        // Enrich with deterministic data so the UI can render structured results.
-        $data = array_merge($deterministic, $raw);
-        $data['text'] = $text;
+        // Pour une question libre, la réponse détaillée complète la synthèse.
+        if ($intent === self::INTENT_GENERAL_QUESTION && ! empty($narrative['reponse'])) {
+            $text = $narrative['synthese'] !== null
+                ? $narrative['synthese']."\n\n".$narrative['reponse']
+                : $narrative['reponse'];
+        }
 
-        return ['text' => $text, 'ai_generated' => true];
+        return [
+            'text' => $text,
+            'ai_generated' => true,
+            'ia' => $narrative,
+        ];
+    }
+
+    /**
+     * Champs narratifs retenus pour chaque intention.
+     *
+     * @return list<string>
+     */
+    protected function aiNarrativeFields(string $intent): array
+    {
+        return match ($intent) {
+            self::INTENT_COST_ESTIMATION => ['synthese', 'hypotheses', 'recommandations', 'informations_manquantes'],
+            self::INTENT_DELAY_RISK => ['synthese', 'causes_possibles', 'actions_recommandees', 'limites'],
+            self::INTENT_FUNDING_FORECAST => ['synthese', 'hypotheses', 'recommandations', 'informations_manquantes'],
+            self::INTENT_PROJECT_OVERVIEW => ['synthese', 'alertes'],
+            default => ['synthese', 'reponse', 'limite'],
+        };
+    }
+
+    /**
+     * Construit la charge utile narrative IA, filtrée et assainie.
+     *
+     * @return array<string, string|list<string>>
+     */
+    protected function buildAiNarrative(string $intent, array $raw): array
+    {
+        $narrative = [];
+
+        foreach ($this->aiNarrativeFields($intent) as $field) {
+            $value = $raw[$field] ?? null;
+
+            if (in_array($field, self::AI_LIST_FIELDS, true)) {
+                $items = $this->sanitizeNarrativeList($value);
+                if ($items) {
+                    $narrative[$field] = $items;
+                }
+
+                continue;
+            }
+
+            if (! in_array($field, self::AI_TEXT_FIELDS, true)) {
+                continue;
+            }
+
+            $text = $this->sanitizeNarrativeText(is_string($value) ? $value : null);
+            if ($text !== null) {
+                $narrative[$field] = $text;
+            }
+        }
+
+        // « limite » (texte) est exposé sous forme de liste pour un rendu homogène.
+        if (! empty($narrative['limite'])) {
+            $limites = $narrative['limites'] ?? [];
+            $limites[] = $narrative['limite'];
+            $narrative['limites'] = array_values(array_unique($limites));
+            unset($narrative['limite']);
+        }
+
+        return $narrative;
+    }
+
+    /**
+     * Assainit un texte narratif : suppression du HTML, des caractères de
+     * contrôle et troncature.
+     */
+    protected function sanitizeNarrativeText(?string $value, ?int $maxLength = null): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $text = (string) $value;
+
+        // Blocs script/style et balises HTML (sans toucher aux comparateurs « < »).
+        $text = preg_replace('#<(script|style)\b[^>]*>.*?</\1>#is', ' ', $text) ?? $text;
+        $text = preg_replace('#</?[a-z][^>]*>#i', ' ', $text) ?? $text;
+
+        // Caractères de contrôle et caractères de largeur nulle.
+        $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text) ?? $text;
+        $text = preg_replace('/[\x{200B}-\x{200F}\x{FEFF}]/u', '', $text) ?? $text;
+
+        $text = trim(preg_replace('/[ \t]+/u', ' ', $text) ?? $text);
+
+        if ($text === '') {
+            return null;
+        }
+
+        $max = $maxLength ?? self::AI_TEXT_MAX_LENGTH;
+
+        if (mb_strlen($text) > $max) {
+            $text = rtrim(mb_substr($text, 0, $max - 1)).'…';
+        }
+
+        return $text;
+    }
+
+    /**
+     * Assainit une liste de textes narratifs.
+     *
+     * @param  mixed  $value
+     * @return list<string>
+     */
+    protected function sanitizeNarrativeList($value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($value as $item) {
+            if (is_array($item)) {
+                $item = $item['texte'] ?? $item['text'] ?? null;
+            }
+
+            if (! is_scalar($item)) {
+                continue;
+            }
+
+            $text = $this->sanitizeNarrativeText((string) $item, self::AI_ITEM_MAX_LENGTH);
+            if ($text === null) {
+                continue;
+            }
+
+            $items[] = $text;
+
+            if (count($items) >= self::AI_LIST_MAX_ITEMS) {
+                break;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Notes narratives déterministes (utilisées quand l'IA est indisponible).
+     *
+     * @return array<string, list<string>>
+     */
+    protected function deterministicNarrative(string $intent, array $deterministic): array
+    {
+        $narrative = [];
+
+        foreach (['informations_manquantes', 'limites'] as $field) {
+            $items = $this->sanitizeNarrativeList($deterministic[$field] ?? null);
+            if ($items) {
+                $narrative[$field] = $items;
+            }
+        }
+
+        if ($intent === self::INTENT_DELAY_RISK && ! empty($narrative['informations_manquantes'])) {
+            $narrative['limites'] = $narrative['limites'] ?? $narrative['informations_manquantes'];
+        }
+
+        if ($intent === self::INTENT_PROJECT_OVERVIEW) {
+            $alerts = $this->deterministicOverviewAlerts($deterministic);
+            if ($alerts) {
+                $narrative['alertes'] = $alerts;
+            }
+        }
+
+        return $narrative;
+    }
+
+    /**
+     * Alertes déterministes de la vue d'ensemble (projets à risque ou sous-financés).
+     *
+     * @return list<string>
+     */
+    protected function deterministicOverviewAlerts(array $deterministic): array
+    {
+        $projects = $deterministic['projects'] ?? [];
+        if (! is_array($projects)) {
+            return [];
+        }
+
+        $alerts = [];
+
+        foreach ($projects as $project) {
+            if (! is_array($project)) {
+                continue;
+            }
+
+            $name = (string) ($project['name'] ?? 'Projet');
+            $risque = (string) ($project['risque'] ?? self::RISK_UNKNOWN);
+            $need = (float) ($project['besoin_financement'] ?? 0);
+
+            if ($risque === self::RISK_HIGH) {
+                $alerts[] = "{$name} : niveau de risque de retard élevé.";
+            } elseif ($risque === self::RISK_MEDIUM) {
+                $alerts[] = "{$name} : niveau de risque de retard moyen à surveiller.";
+            }
+
+            if ($need > 0) {
+                $alerts[] = "{$name} : besoin de financement non couvert à ce jour.";
+            }
+
+            if (count($alerts) >= self::AI_LIST_MAX_ITEMS) {
+                break;
+            }
+        }
+
+        return $alerts;
     }
 
     /**

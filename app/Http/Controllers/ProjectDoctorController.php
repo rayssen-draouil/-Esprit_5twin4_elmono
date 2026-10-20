@@ -67,16 +67,6 @@ class ProjectDoctorController extends Controller
                 ], 403);
             }
         }
-        if ($projectId !== null) {
-            $accessibleIds = $this->doctor->accessibleProjects($user)->pluck('id')->toArray();
-            if (! in_array($projectId, $accessibleIds, true)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Vous n\'avez pas accès à ce projet.',
-                    'intent' => $intent,
-                ], 403);
-            }
-        }
 
         try {
             $result = $this->doctor->handle($user, [
