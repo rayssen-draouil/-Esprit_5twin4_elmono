@@ -31,10 +31,16 @@ class MaintenanceLifecycleService
      *     recommendations?: ?string
      * } $reportData
      */
+    /**
+     * Submit completion by the assigned technician.
+     * Transitions: in_progress -> completed (moves from step 2 to step 3)
+     * Automatically updates infrastructure health to 100% if all maintenances done,
+     * and sends push/in-app notifications and email alerts to the manager.
+     */
     public function submitCompletion(Maintenance $maintenance, User $technician, array $reportData): Maintenance
     {
         return DB::transaction(function () use ($maintenance, $technician, $reportData) {
-            $locked = Maintenance::lockForUpdate()->findOrFail($maintenance->id);
+            $locked = Maintenance::with(['infrastructure', 'technician'])->lockForUpdate()->findOrFail($maintenance->id);
 
             // 1. Authorization & assignment verification
             if ((int) $locked->technician_id !== (int) $technician->id) {
@@ -42,8 +48,8 @@ class MaintenanceLifecycleService
             }
 
             // 2. Lifecycle state verification
-            if ($locked->status !== 'in_progress') {
-                throw new \DomainException("L'intervention doit être en cours d'exécution pour être signalée comme terminée (statut actuel : {$locked->display_status_label}).");
+            if (!in_array($locked->status, ['in_progress', 'awaiting_validation'])) {
+                throw new \DomainException("L'intervention doit être en cours d'exécution pour être confirmée comme terminée (statut actuel : {$locked->display_status_label}).");
             }
 
             // 3. Technical report requirement
@@ -73,9 +79,11 @@ class MaintenanceLifecycleService
 
             $locked->result = $resultText;
             $locked->completion_submitted_at = $submittedAt;
+            $locked->completed_at = $submittedAt;
+            $locked->performed_at = $submittedAt;
             $locked->completion_report = $report;
-            $locked->status = 'awaiting_validation';
-            $locked->manager_correction_notes = null; // Clear previous correction notes
+            $locked->status = 'completed'; // Step 2 to Step 3
+            $locked->manager_correction_notes = null;
 
             if (!empty($reportData['duration_hours']) && is_numeric($reportData['duration_hours'])) {
                 $locked->duration_hours = (float) $reportData['duration_hours'];
@@ -83,10 +91,162 @@ class MaintenanceLifecycleService
 
             $locked->save();
 
-            Log::info('Technician submitted completion for maintenance', [
+            // 4. Update Infrastructure health and condition
+            $healthScore = 100;
+            $infra = $locked->infrastructure;
+            if ($infra) {
+                $infra->last_maintenance_date = $submittedAt->format('Y-m-d');
+                if (!$infra->next_maintenance_date || $infra->next_maintenance_date->isPast()) {
+                    $infra->next_maintenance_date = now()->addMonths(6)->format('Y-m-d');
+                }
+
+                // Check if any other active/pending maintenances remain on this infrastructure
+                $remainingActive = Maintenance::where('infrastructure_id', $infra->id)
+                    ->whereIn('status', ['in_progress', 'planned', 'reported', 'awaiting_validation'])
+                    ->where('id', '!=', $locked->id)
+                    ->count();
+
+                if ($remainingActive === 0) {
+                    $infra->status = 'operational';
+                    $infra->condition = 'excellent';
+
+                    // Update AI health analysis cache to 100%
+                    if (!empty($infra->ai_health_analysis) && is_array($infra->ai_health_analysis)) {
+                        $aiData = $infra->ai_health_analysis;
+                        $aiData['health_score'] = 100;
+                        $aiData['overall_risk_level'] = 'low';
+                        $aiData['condition_summary'] = "L'ensemble des travaux de maintenance sur cet ouvrage ont été réalisés et validés. Intégrité opérationnelle à 100%.";
+                        $aiData['top_risk_factors'] = [];
+                        $aiData['analyzed_at'] = now()->toIso8601String();
+                        $aiData['analyzed_at_display'] = now()->format('d/m/Y à H:i');
+                        $infra->ai_health_analysis = $aiData;
+                    }
+                    $infra->save();
+                    $healthScore = 100;
+                } else {
+                    if ($infra->status === 'maintenance') {
+                        $infra->status = 'operational';
+                    }
+                    $infra->save();
+                    $healthScore = $infra->health_score;
+                }
+            }
+
+            // 5. Free technician status if no other active assignments
+            if ($technician->status === 'busy') {
+                $otherActive = Maintenance::where('technician_id', $technician->id)
+                    ->whereIn('status', ['in_progress', 'awaiting_validation'])
+                    ->where('id', '!=', $locked->id)
+                    ->count();
+
+                if ($otherActive === 0) {
+                    $technician->status = 'available';
+                    $technician->save();
+                }
+            }
+
+            // 6. Notify Manager(s) via In-App (Notifications Table) & Brevo Email
+            $managers = User::whereIn('role', ['manager', 'gestionnaire', 'admin'])->get();
+            foreach ($managers as $mgr) {
+                try {
+                    $mgr->notify(new \App\Notifications\MaintenanceStatusNotification($locked, 'completed', $technician, ['health_score' => $healthScore]));
+                } catch (\Throwable $e) {
+                    Log::warning('Failed sending in-app notification for completed maintenance: ' . $e->getMessage());
+                }
+
+                try {
+                    $this->brevoService->sendTechnicianCompletedNotificationToManager($locked, $technician, $mgr, $healthScore);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed sending completion email to manager: ' . $e->getMessage());
+                }
+            }
+
+            Log::info('Technician completed maintenance and notified manager', [
                 'maintenance_id' => $locked->id,
                 'reference_code' => $locked->reference_code,
                 'technician_id' => $technician->id,
+                'health_score' => $healthScore,
+            ]);
+
+            return $locked;
+        });
+    }
+
+    /**
+     * Technician requests a prolongation / postponement of the maintenance.
+     */
+    public function prolongIntervention(Maintenance $maintenance, User $technician, int $days, string $reason): Maintenance
+    {
+        return DB::transaction(function () use ($maintenance, $technician, $days, $reason) {
+            $locked = Maintenance::with(['infrastructure', 'technician'])->lockForUpdate()->findOrFail($maintenance->id);
+
+            // 1. Authorization & assignment verification
+            if ((int) $locked->technician_id !== (int) $technician->id) {
+                throw new \DomainException("Vous n'êtes pas le technicien affecté à cette opération de maintenance.");
+            }
+
+            // 2. State verification
+            if (!in_array($locked->status, ['in_progress', 'planned'])) {
+                throw new \DomainException("Seules les opérations en cours ou planifiées peuvent faire l'objet d'une prolongation.");
+            }
+
+            if ($days < 1 || $days > 60) {
+                throw new \InvalidArgumentException("La durée de prolongation doit être comprise entre 1 et 60 jours.");
+            }
+
+            $reason = trim($reason);
+            if (empty($reason)) {
+                throw new \InvalidArgumentException("Veuillez préciser le motif de prolongation pour le gestionnaire.");
+            }
+
+            // 3. Calculate new scheduled date
+            $baseDate = $locked->scheduled_at ? $locked->scheduled_at->copy() : now();
+            if ($baseDate->isPast()) {
+                $baseDate = now();
+            }
+            $newScheduledAt = $baseDate->addDays($days);
+
+            $locked->scheduled_at = $newScheduledAt;
+            $locked->prolonged_at = now();
+            $locked->prolongation_days = ($locked->prolongation_days ?? 0) + $days;
+            $locked->prolongation_reason = $reason;
+
+            // Maintain history
+            $history = $locked->prolongation_history ?? [];
+            $history[] = [
+                'days' => $days,
+                'reason' => $reason,
+                'prolonged_at' => now()->toIso8601String(),
+                'new_scheduled_at' => $newScheduledAt->toIso8601String(),
+                'technician_name' => $technician->name,
+            ];
+            $locked->prolongation_history = $history;
+            $locked->save();
+
+            // 4. Notify Manager(s) via In-App (Notifications Table) & Brevo Email
+            $managers = User::whereIn('role', ['manager', 'gestionnaire', 'admin'])->get();
+            foreach ($managers as $mgr) {
+                try {
+                    $mgr->notify(new \App\Notifications\MaintenanceStatusNotification($locked, 'prolonged', $technician, [
+                        'days' => $days,
+                        'reason' => $reason,
+                    ]));
+                } catch (\Throwable $e) {
+                    Log::warning('Failed sending in-app notification for prolonged maintenance: ' . $e->getMessage());
+                }
+
+                try {
+                    $this->brevoService->sendProlongationNotificationToManager($locked, $technician, $mgr, $days, $reason);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed sending prolongation email to manager: ' . $e->getMessage());
+                }
+            }
+
+            Log::info('Technician prolonged maintenance', [
+                'maintenance_id' => $locked->id,
+                'reference_code' => $locked->reference_code,
+                'days' => $days,
+                'new_scheduled_at' => $newScheduledAt->toIso8601String(),
             ]);
 
             return $locked;

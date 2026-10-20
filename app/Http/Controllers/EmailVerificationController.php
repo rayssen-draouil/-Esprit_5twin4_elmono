@@ -33,7 +33,12 @@ class EmailVerificationController extends Controller
             return back()->withErrors(['email' => 'Trop de demandes. Réessayez plus tard.']);
         }
         RateLimiter::hit($key, 60);
-        $request->user()->sendEmailVerificationNotification();
+        try {
+            $request->user()->sendEmailVerificationNotification();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to resend verification email: ' . $e->getMessage());
+            return back()->withErrors(['email' => "Impossible d'envoyer l'e-mail pour le moment. Veuillez réessayer plus tard."]);
+        }
 
         return back()->with('success', 'Un nouveau lien de vérification a été envoyé.');
     }
