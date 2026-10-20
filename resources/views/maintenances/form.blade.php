@@ -523,15 +523,14 @@ function openTechRecommendationModal() {
 
         const recs = data.recommendations;
         const rankings = recs.candidate_rankings || [];
-        const allCandidates = recs.all_candidates || [];
 
-        if (rankings.length === 0 && allCandidates.length === 0) {
+        if (rankings.length === 0) {
             document.getElementById('tech-rec-empty').style.display = 'block';
             document.getElementById('tech-rec-empty-reason').textContent = recs.no_suitable_candidate_reason || "Aucun technicien éligible n'a été trouvé pour cette intervention.";
             return;
         }
 
-        renderCandidateRankings(rankings, allCandidates, recs.is_ai_generated);
+        renderCandidateRankings(rankings, recs.is_ai_generated);
         document.getElementById('tech-rec-results').style.display = 'block';
     })
     .catch(err => {
@@ -549,7 +548,7 @@ function closeTechRecommendationModal() {
     }
 }
 
-function renderCandidateRankings(rankings, allCandidates, isAi) {
+function renderCandidateRankings(rankings, isAi) {
     const container = document.getElementById('tech-rec-cards-container');
     container.innerHTML = '';
 
@@ -610,67 +609,6 @@ function renderCandidateRankings(rankings, allCandidates, isAi) {
                 <button type="button" class="button button-small" onclick="selectRecommendedTechnician(${cand.technician_id}, '${escapeHtml(cand.name).replace(/'/g, "\\'")}', '${escapeHtml(cand.specialty_match).replace(/'/g, "\\'")}')" style="${isTop ? 'background: var(--aqua);' : 'background: var(--deep);'} color: #fff;">
                     ✓ Affecter ce technicien
                 </button>
-            </div>
-        `;
-        container.appendChild(card);
-    });
-
-    renderRemainingTechnicians(container, rankings, allCandidates);
-}
-
-/**
- * Affiche les techniciens de l'effectif non retenus par le classement IA.
- * Ils restent sélectionnables directement dans le formulaire.
- */
-function renderRemainingTechnicians(container, rankings, allCandidates) {
-    const rankedIds = (rankings || []).map(c => Number(c.technician_id));
-    const others = (allCandidates || []).filter(c => !rankedIds.includes(Number(c.id)));
-
-    if (!others.length) {
-        return;
-    }
-
-    const header = document.createElement('div');
-    header.style.cssText = 'margin: 24px 0 12px; padding-top: 16px; border-top: 1px dashed var(--line);';
-    header.innerHTML = `
-        <span style="font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;">Effectif technique restant (${others.length})</span>
-        <p style="font-size: 12px; color: var(--muted); margin: 4px 0 0;">Ces techniciens n'ont pas été retenus par le classement IA, mais restent directement affectables.</p>
-    `;
-    container.appendChild(header);
-
-    others.forEach(cand => {
-        const card = document.createElement('div');
-        card.style.cssText = 'border: 1px solid var(--line); background: #ffffff; border-radius: 8px; padding: 14px; margin-bottom: 10px;';
-
-        const score = Number(cand.compatibility_score || 0);
-        const matchLabel = score >= 80 ? 'Excellente' : (score >= 60 ? 'Bonne' : 'Partielle');
-        const matchClass = matchLabel === 'Excellente' ? 'background: #d1fae5; color: #065f46;' : (matchLabel === 'Bonne' ? 'background: #e0f2fe; color: #0369a1;' : 'background: #fef3c7; color: #92400e;');
-        const inactive = cand.status === 'inactive';
-
-        const action = inactive
-            ? '<span style="font-size: 11px; color: var(--muted);">Technicien inactif — non affectable</span>'
-            : `<button type="button" class="button button-small" onclick="selectRecommendedTechnician(${Number(cand.id)}, '${escapeHtml(cand.name).replace(/'/g, "\\'")}', '${matchLabel}')" style="background: var(--deep); color: #fff;">✓ Affecter ce technicien</button>`;
-
-        card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; font-weight: 800; font-size: 13px; background: #f1f5f9; color: var(--ink);">
-                        ${score}
-                    </span>
-                    <div>
-                        <strong style="font-size: 14px; color: var(--deep); display: block;">${escapeHtml(cand.name)}</strong>
-                        <span style="font-size: 12px; color: var(--muted);">${escapeHtml(cand.speciality)}</span>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                    <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; ${matchClass};">${matchLabel}</span>
-                    <span style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #f1f5f9; color: var(--ink);">💼 ${Number(cand.active_workload || 0)} intervention(s) en cours</span>
-                    ${inactive ? '<span style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #fee2e2; color: #991b1b;">Inactif</span>' : ''}
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: flex-end; align-items: center; border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 10px;">
-                ${action}
             </div>
         `;
         container.appendChild(card);

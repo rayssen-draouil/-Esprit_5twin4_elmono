@@ -20,9 +20,14 @@
                 ⚠ <span>Incidents</span>
             </a>
 
-            <a class="{{ request()->routeIs('back.zones.*', 'back.alerts.*') ? 'active' : '' }}"
+            <a class="{{ request()->routeIs('back.zones.*') ? 'active' : '' }}"
                href="{{ route('back.zones.index') }}">
                 ◎ <span>Zones</span>
+            </a>
+
+            <a class="{{ request()->routeIs('back.alerts.*') ? 'active' : '' }}"
+               href="{{ route('back.alerts.index') }}">
+                ◉ <span>Alertes</span>
             </a>
 
             <a class="{{ request()->routeIs('infrastructures.*') || request()->routeIs('back.infrastructures') ? 'active' : '' }}"
@@ -50,6 +55,11 @@
                 ♙ <span>Techniciens</span>
             </a>
 
+            <a class="{{ request()->routeIs('equipements.*') ? 'active' : '' }}"
+               href="{{ route('equipements.index') }}">
+                ⚙ <span>Équipements</span>
+            </a>
+
             <p class="sidebar-label">PROJECTS</p>
 
             <a class="{{ request()->routeIs('projects.*') || request()->routeIs('back.projects') ? 'active' : '' }}"
@@ -60,16 +70,6 @@
             <a class="{{ request()->routeIs('financements.*') || request()->routeIs('back.funding') ? 'active' : '' }}"
                href="{{ route('financements.index') }}">
                 ◒ <span>Financement</span>
-            </a>
-
-            <a class="{{ request()->routeIs('back.financial.dashboard') ? 'active' : '' }}"
-               href="{{ route('back.financial.dashboard') }}">
-                ⚖ <span>Tableau de bord financier</span>
-            </a>
-
-            <a class="{{ request()->routeIs('back.pilotage') ? 'active' : '' }}"
-               href="{{ route('back.pilotage') }}">
-                📊 <span>Centre de pilotage</span>
             </a>
 
             <p class="sidebar-label">MANAGEMENT</p>
@@ -114,7 +114,7 @@
             </span>
             <span>
                 <strong>{{ Auth::user()->name }}</strong>
-                <small>{{ Auth::user()->roleLabel() }}</small>
+                <small>{{ ucfirst(Auth::user()->role) }}</small>
             </span>
         </div>
     </div>

@@ -45,6 +45,14 @@ return [
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
     ],
 
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-3-5-haiku-latest'),
+        'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com/v1'),
+        'timeout' => (int) env('ANTHROPIC_TIMEOUT', 60),
+        'connect_timeout' => (int) env('ANTHROPIC_CONNECT_TIMEOUT', 10),
+    ],
+
     'brevo' => [
         'driver' => env('BREVO_MAIL_DRIVER', env('MAIL_MAILER', 'smtp')),
         'api_key' => env('BREVO_API_KEY', env('brevo_api_key')),
@@ -56,14 +64,6 @@ return [
         'sender_email' => env('BREVO_SENDER_EMAIL', env('brevo_sender_email', env('EMAIL_FROM', env('MAIL_FROM_ADDRESS', 'miladiadem58@gmail.com')))),
         'timeout' => (int) env('BREVO_TIMEOUT', 15),
         'ssl_verify' => env('BREVO_SSL_VERIFY', false),
-    ],
-
-    'gemini' => [
-        'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
-        'base_url' => rtrim(env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'), '/'),
-        'timeout' => (int) env('GEMINI_TIMEOUT', 60),
-        'connect_timeout' => (int) env('GEMINI_CONNECT_TIMEOUT', 15),
     ],
 
 ];

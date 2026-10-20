@@ -6,13 +6,12 @@ use App\Http\Requests\StoreMaintenanceRequest;
 use App\Http\Requests\UpdateMaintenanceRequest;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
-use App\Models\User;
+use App\Models\Technicien;
 use App\Services\MaintenanceLifecycleService;
 use App\Services\TechnicianAssignmentInvitationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class MaintenanceController extends Controller
@@ -86,7 +85,7 @@ class MaintenanceController extends Controller
 
         // 4. Options
         $infrastructures = Infrastructure::orderBy('name')->get(['id', 'name', 'reference_code']);
-        $technicians = User::technicians()->orderBy('name')->get(['id', 'name']);
+        $technicians = Technicien::eligibleForAssignment()->orderBy('name')->get(['id', 'name']);
         $types = ['Préventive', 'Corrective', 'Inspection', 'Réglementaire', 'Urgence'];
         $priorities = ['low' => 'Basse', 'medium' => 'Moyenne', 'high' => 'Haute', 'critical' => 'Critique'];
         $statuses = ['planned' => 'Planifiée', 'in_progress' => 'En cours', 'completed' => 'Terminée', 'cancelled' => 'Annulée', 'overdue' => 'En retard'];
@@ -345,7 +344,7 @@ class MaintenanceController extends Controller
     {
         return [
             'infrastructures' => Infrastructure::orderBy('name')->get(['id', 'name', 'reference_code']),
-            'technicians' => User::technicians()->orderBy('name')->get(['id', 'name', 'speciality']),
+            'technicians' => Technicien::eligibleForAssignment()->orderBy('name')->get(['id', 'name', 'speciality']),
             'types' => ['Préventive', 'Corrective', 'Inspection', 'Réglementaire', 'Urgence'],
             'priorities' => [
                 'low' => 'Basse',
@@ -400,7 +399,7 @@ class MaintenanceController extends Controller
             }
         }
         if ($request->filled('technician_id')) {
-            $tech = User::find($request->input('technician_id'));
+            $tech = Technicien::find($request->input('technician_id'));
             if ($tech) {
                 $filters['technician_id'] = ['label' => 'Technicien : ' . $tech->name, 'param' => 'technician_id'];
             }

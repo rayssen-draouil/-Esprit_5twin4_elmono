@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\MaintenanceIntelligenceScan;
-use App\Models\User;
+use App\Models\Technicien;
 use App\Models\Zone;
 use App\Services\AiMaintenancePlannerService;
 use App\Services\MaintenanceRiskAnalysisService;
@@ -47,7 +47,7 @@ class MaintenanceIntelligenceController extends Controller
         // 3. Filter options
         $zones = Zone::orderBy('name')->get(['id', 'name']);
         $infrastructureTypes = Infrastructure::select('type')->distinct()->whereNotNull('type')->pluck('type')->sort()->values();
-        $technicians = User::technicians()->orderBy('name')->get(['id', 'name', 'speciality', 'status']);
+        $technicians = Technicien::eligibleForAssignment()->orderBy('name')->get(['id', 'name', 'speciality', 'status']);
 
         $maintTypes = ['Préventive', 'Corrective', 'Inspection', 'Réglementaire', 'Urgence'];
         $priorities = [
@@ -162,7 +162,7 @@ class MaintenanceIntelligenceController extends Controller
         $validator = Validator::make($request->all(), [
             'infrastructure_id' => ['required', 'integer', 'exists:infrastructures,id'],
             'reference_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9\-_]+$/i', 'unique:maintenances,reference_code'],
-            'technician_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('role', 'technician')],
+            'technician_id' => ['nullable', 'integer', Rule::in(Technicien::eligibleForAssignment()->pluck('id'))],
             'team' => ['nullable', 'string', 'max:255', 'regex:/^[\p{L}\s\-\'.]+$/u'],
             'type' => ['required', 'string', 'in:Préventive,Corrective,Inspection,Réglementaire,Urgence'],
             'priority' => ['required', 'in:low,medium,high,critical'],

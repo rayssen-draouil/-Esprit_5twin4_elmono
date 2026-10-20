@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Technicien;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -18,7 +19,7 @@ class StoreMaintenanceRequest extends FormRequest
         return [
             'infrastructure_id' => ['required', 'integer', 'exists:infrastructures,id'],
             'reference_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9\-_]+$/i', 'unique:maintenances,reference_code'],
-            'technician_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('role', 'technician')],
+            'technician_id' => ['nullable', 'integer', Rule::in(Technicien::eligibleForAssignment()->pluck('id'))],
             'team' => ['nullable', 'string', 'max:255', 'regex:/^[\p{L}\s\-\'.]+$/u'],
             'type' => ['required', 'string', 'max:100'],
             'priority' => ['required', 'in:low,medium,high,critical'],

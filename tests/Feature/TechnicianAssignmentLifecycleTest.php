@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Infrastructure;
+use App\Models\Incident;
+use App\Models\Intervention;
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
+use App\Models\Technicien;
 use App\Models\User;
 use App\Models\Zone;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,12 +19,19 @@ class TechnicianAssignmentLifecycleTest extends TestCase
     use RefreshDatabase;
 
     protected User $manager;
+
     protected User $technicianUser;
+
     protected User $citizen;
-    protected User $technician;
-    protected User $technician2;
+
+    protected Technicien $technician;
+
+    protected Technicien $technician2;
+
     protected Zone $zone;
+
     protected Infrastructure $infrastructure;
+
     protected Maintenance $maintenance;
 
     protected function setUp(): void
@@ -33,27 +43,28 @@ class TechnicianAssignmentLifecycleTest extends TestCase
             'email' => 'manager@aquasecure.fr',
         ]);
 
+        $this->technicianUser = User::factory()->create([
+            'role' => 'technician',
+            'email' => 'sarah.petit@aquasecure.fr',
+        ]);
+
         $this->citizen = User::factory()->create([
             'role' => 'citizen',
             'email' => 'citoyen@aquasecure.fr',
         ]);
 
-        // Le technicien est un rôle applicatif : il s'agit du compte utilisateur.
-        $this->technician = User::factory()->create([
-            'role' => 'technician',
-            'email' => 'sarah.petit@aquasecure.fr',
+        $this->technician = Technicien::create([
+            'user_id' => $this->technicianUser->id,
             'name' => 'Sarah Petit',
+            'email' => 'sarah.petit@aquasecure.fr',
             'phone' => '+33 4 72 00 11 22',
             'speciality' => 'Capteurs & Télémétrie',
             'status' => 'available',
         ]);
 
-        $this->technicianUser = $this->technician;
-
-        $this->technician2 = User::factory()->create([
-            'role' => 'technician',
-            'email' => 'marc.lemoine@aquasecure.fr',
+        $this->technician2 = Technicien::create([
             'name' => 'Marc Lemoine',
+            'email' => 'marc.lemoine@aquasecure.fr',
             'phone' => '+33 5 56 00 22 33',
             'speciality' => 'Génie Civil',
             'status' => 'available',
@@ -280,6 +291,8 @@ class TechnicianAssignmentLifecycleTest extends TestCase
      */
     public function test_technician_sees_only_own_assigned_operations(): void
     {
+        $this->withoutVite();
+
         // Maintenance 1 assigned to Sarah
         $this->maintenance->update([
             'technician_id' => $this->technician->id,
@@ -299,12 +312,47 @@ class TechnicianAssignmentLifecycleTest extends TestCase
             'scheduled_at' => now()->addDays(3),
         ]);
 
+        Intervention::create([
+            'incident_id' => $this->maintenance->infrastructure->zone->incidents()->create([
+                'type' => 'Fuite',
+                'status' => 'reported',
+                'description' => 'Fuite sur la conduite principale.',
+                'location' => 'Lyon',
+                'reported_at' => now(),
+            ])->id,
+            'technician_id' => $this->technician->id,
+            'team' => 'Équipe Sarah',
+            'scheduled_at' => now()->addDay(),
+            'status' => 'planned',
+        ]);
+
+        Intervention::create([
+            'incident_id' => $this->maintenance->infrastructure->zone->incidents()->create([
+                'type' => 'Contamination',
+                'status' => 'reported',
+                'description' => 'Contrôle qualité nécessaire.',
+                'location' => 'Grenoble',
+                'reported_at' => now(),
+            ])->id,
+            'technician_id' => $this->technician2->id,
+            'team' => 'Équipe Marc',
+            'scheduled_at' => now()->addDays(2),
+            'status' => 'planned',
+        ]);
+
+        $dashboardResponse = $this->actingAs($this->technicianUser)
+            ->get(route('dashboard'));
+
+        $dashboardResponse->assertRedirect(route('technicien.interventions.index'));
+
         $response = $this->actingAs($this->technicianUser)
             ->get(route('technicien.interventions.index'));
 
         $response->assertStatus(200);
         $response->assertSee('MNT-2026-TEST');
         $response->assertDontSee('MNT-2026-MARC');
+        $response->assertSee('Équipe Sarah');
+        $response->assertDontSee('Équipe Marc');
     }
 
     /**
@@ -474,6 +522,87 @@ class TechnicianAssignmentLifecycleTest extends TestCase
             ->assertSee('Contrôle effectué, aucune fuite.')
             ->assertSee('Invitations en Attente')
             ->assertSee($this->technician2->name);
+    }
+
+    public function test_manager_dashboard_shows_approved_technicians_and_active_interventions(): void
+    {
+        $incident = Incident::factory()->create([
+            'type' => 'Fuite principale',
+            'location' => 'Zone Rhône',
+        ]);
+        Intervention::create([
+            'incident_id' => $incident->id,
+            'technician_id' => $this->technician->id,
+            'team' => 'Équipe Rhône',
+            'scheduled_at' => now()->subHour(),
+            'scheduled_duration_minutes' => 120,
+            'status' => 'in_progress',
+            'technician_response' => 'confirmed',
+            'started_at' => now()->subHour(),
+        ]);
+
+        $pendingUser = User::factory()->create([
+            'role' => 'technician',
+            'name' => 'Technicien en attente',
+            'technician_approval_status' => User::TECHNICIAN_APPROVAL_PENDING,
+        ]);
+        Technicien::create([
+            'user_id' => $pendingUser->id,
+            'name' => $pendingUser->name,
+            'email' => $pendingUser->email,
+        ]);
+
+        $this->actingAs($this->manager)
+            ->get(route('manager.dashboard'))
+            ->assertOk()
+            ->assertSee('Techniciens approuvés')
+            ->assertSee('Sarah Petit')
+            ->assertDontSee('Technicien en attente')
+            ->assertSee('Interventions En Cours de Réalisation')
+            ->assertSee('Fuite principale')
+            ->assertSee('Zone Rhône')
+            ->assertSee('Équipe Rhône');
+    }
+
+    public function test_completed_intervention_is_counted_and_listed_on_manager_dashboard(): void
+    {
+        $incident = Incident::factory()->create([
+            'type' => 'Fuite terminée',
+            'location' => 'Zone Sud',
+        ]);
+        $intervention = Intervention::create([
+            'incident_id' => $incident->id,
+            'technician_id' => $this->technician->id,
+            'team' => 'Équipe de réparation',
+            'scheduled_at' => now()->subHour(),
+            'scheduled_duration_minutes' => 60,
+            'priority' => 'medium',
+            'status' => 'in_progress',
+            'technician_response' => 'confirmed',
+            'started_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($this->manager)
+            ->put(route('interventions.update', $intervention), [
+                'incident_id' => $incident->id,
+                'technician_id' => $this->technician->id,
+                'team' => 'Équipe de réparation',
+                'scheduled_at' => now()->subHour()->format('Y-m-d H:i:s'),
+                'scheduled_duration_minutes' => 60,
+                'priority' => 'medium',
+                'status' => 'completed',
+                'result' => 'Réparation terminée et vérifiée.',
+            ])
+            ->assertRedirect(route('interventions.show', $intervention));
+
+        $this->assertNotNull($intervention->fresh()->completed_at);
+
+        $dashboard = $this->get(route('manager.dashboard'));
+        $dashboard->assertOk()
+            ->assertSee('Fuite terminée')
+            ->assertSee('Zone Sud')
+            ->assertSee('Terminée');
+        $this->assertSame(1, $dashboard->viewData('stats')['completed_month_count']);
     }
 
     /**

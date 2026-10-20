@@ -4,7 +4,8 @@ namespace App\Services;
 
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
-use App\Models\User;
+use App\Models\Intervention;
+use App\Models\Technicien;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -90,11 +91,42 @@ class BrevoEmailService
     }
 
     /**
+     * Notify a technician when an intervention is assigned to them.
+     *
+     * @return array{success: bool, message_id: ?string, error: ?string}
+     */
+    public function sendInterventionAssignmentNotification(Intervention $intervention, Technicien $technician): array
+    {
+        if (empty($technician->email) || ! filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'success' => false,
+                'message_id' => null,
+                'error' => 'Adresse email du technicien invalide ou manquante.',
+            ];
+        }
+
+        $intervention->loadMissing('incident');
+        $subject = "Nouvelle intervention assignée — #{$intervention->id}";
+        $html = view('emails.interventions.assigned', [
+            'technician' => $technician,
+            'intervention' => $intervention,
+            'interventionUrl' => route('interventions.show', $intervention),
+        ])->render();
+
+        return $this->sendTransactionalEmail(
+            recipientEmail: $technician->email,
+            recipientName: $technician->name,
+            subject: $subject,
+            htmlContent: $html,
+        );
+    }
+
+    /**
      * Send a notification to the technician confirming that their completion was validated and closed.
      *
      * @return array{success: bool, message_id: ?string, error: ?string}
      */
-    public function sendClosureNotification(Maintenance $maintenance, User $technician): array
+    public function sendClosureNotification(Maintenance $maintenance, Technicien $technician): array
     {
         if (empty($technician->email) || !filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
             return [
@@ -127,7 +159,7 @@ class BrevoEmailService
      *
      * @return array{success: bool, message_id: ?string, error: ?string}
      */
-    public function sendCorrectionsRequestedNotification(Maintenance $maintenance, User $technician, string $notes): array
+    public function sendCorrectionsRequestedNotification(Maintenance $maintenance, Technicien $technician, string $notes): array
     {
         if (empty($technician->email) || !filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
             return [

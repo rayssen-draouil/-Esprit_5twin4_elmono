@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\Signalement;
-use App\Models\User;
+use App\Models\Technicien;
 use App\Services\CitizenReportAnalysisService;
 use App\Services\InfrastructureHealthAnalysisService;
 use App\Services\TechnicianAssignmentInvitationService;
@@ -209,7 +209,7 @@ class AiIntelligenceSuiteController extends Controller
     public function assignTechnician(Request $request, Maintenance $maintenance): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'technician_id' => ['required', 'integer', Rule::exists('users', 'id')->where('role', 'technician')],
+            'technician_id' => ['required', 'integer', Rule::in(Technicien::eligibleForAssignment()->pluck('id'))],
         ], [
             'technician_id.required' => 'Un technicien doit être sélectionné.',
             'technician_id.exists' => 'Le technicien sélectionné est introuvable.',
@@ -223,7 +223,7 @@ class AiIntelligenceSuiteController extends Controller
         }
 
         $techId = (int) $request->input('technician_id');
-        $technician = User::technicians()->find($techId);
+        $technician = Technicien::eligibleForAssignment()->find($techId);
         if (!$technician) {
             return response()->json([
                 'success' => false,

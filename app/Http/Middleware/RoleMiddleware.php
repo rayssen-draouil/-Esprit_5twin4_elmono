@@ -13,12 +13,17 @@ class RoleMiddleware
         $user = $request->user();
         $role = strtolower((string) ($user?->role ?? ''));
         $aliases = ['gestionnaire' => 'manager', 'citoyen' => 'citizen'];
-
-        if (! $user || ! in_array($aliases[$role] ?? $role, array_map(
+        $allowedRoles = array_map(
             fn (string $value) => $aliases[strtolower($value)] ?? strtolower($value),
             $roles
-        ), true)) {
+        );
+
+        if (! $user || ! in_array($aliases[$role] ?? $role, $allowedRoles, true)) {
             abort(403);
+        }
+
+        if ($role === 'technician' && in_array('technician', $allowedRoles, true) && ! $user->isTechnicianApproved()) {
+            abort(403, 'Votre compte technicien doit être approuvé par un administrateur.');
         }
 
         return $next($request);

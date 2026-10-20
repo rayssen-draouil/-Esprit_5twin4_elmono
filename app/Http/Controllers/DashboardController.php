@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
+use App\Models\Intervention;
+use App\Models\Technicien;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -54,6 +56,25 @@ class DashboardController extends Controller
             ->limit(8)
             ->get();
 
+        $inProgressInterventions = Intervention::with(['incident', 'technician'])
+            ->where('status', 'in_progress')
+            ->orderByDesc('started_at')
+            ->limit(8)
+            ->get();
+
+        $approvedTechnicians = Technicien::withTechnicianAccount()
+            ->with('user')
+            ->orderBy('name')
+            ->get();
+
+        $activeTechnicianIds = $inProgressMaintenances->pluck('technician_id')
+            ->merge($inProgressInterventions->pluck('technician_id'))
+            ->filter()
+            ->unique();
+        $onSiteTechnicians = $approvedTechnicians
+            ->whereIn('id', $activeTechnicianIds)
+            ->values();
+
         // 5. Recently completed & validated maintenances
         $recentlyValidated = Maintenance::with(['infrastructure', 'technician', 'validator'])
             ->where('status', 'completed')
@@ -61,14 +82,25 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $recentlyCompletedInterventions = Intervention::with(['incident', 'technician'])
+            ->where('status', 'completed')
+            ->whereNotNull('completed_at')
+            ->orderByDesc('completed_at')
+            ->limit(5)
+            ->get();
+
         // Summary KPI stats
         $stats = [
             'awaiting_validation_count' => $awaitingValidation->count(),
             'pending_invitations_count' => $pendingInvitations->count(),
-            'in_progress_count' => Maintenance::where('status', 'in_progress')->count(),
+            'in_progress_count' => Maintenance::where('status', 'in_progress')->count()
+                + Intervention::where('status', 'in_progress')->count(),
             'completed_month_count' => Maintenance::where('status', 'completed')
-                ->where('completion_validated_at', '>=', now()->startOfMonth())
-                ->count(),
+                ->whereBetween('completion_validated_at', [now()->startOfMonth(), now()])
+                ->count()
+                + Intervention::where('status', 'completed')
+                    ->whereBetween('completed_at', [now()->startOfMonth(), now()])
+                    ->count(),
         ];
 
         return view('dashboards.manager', compact(
@@ -76,7 +108,11 @@ class DashboardController extends Controller
             'pendingInvitations',
             'recentInvitations',
             'inProgressMaintenances',
+            'inProgressInterventions',
+            'approvedTechnicians',
+            'onSiteTechnicians',
             'recentlyValidated',
+            'recentlyCompletedInterventions',
             'stats'
         ));
     }

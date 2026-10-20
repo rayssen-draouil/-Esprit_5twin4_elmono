@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\Signalement;
+use App\Models\Technicien;
 use App\Models\User;
 use App\Models\Zone;
 use Database\Seeders\InfrastructureMaintenanceSeeder;
@@ -273,23 +274,21 @@ class AiIntelligenceSuiteTest extends TestCase
         $manager = $this->getManagerUser();
 
         // Create 2 active technicians and 1 inactive technician
-        $techActive = User::factory()->create([
-            'role' => 'technician',
+        $techActive = Technicien::create([
             'name' => 'Kamel Ben Salah',
             'email' => 'kamel.test@aquasecure.tn',
             'phone' => '+216 71 100 200',
             'speciality' => 'Électromécanique et Pompage',
             'status' => 'available',
-            ]);
+        ]);
 
-        $techInactive = User::factory()->create([
-            'role' => 'technician',
+        $techInactive = Technicien::create([
             'name' => 'Inactif Test',
             'email' => 'inactif.test@aquasecure.tn',
             'phone' => '+216 71 100 300',
             'speciality' => 'Électromécanique et Pompage',
             'status' => 'inactive',
-            ]);
+        ]);
 
         $infra = Infrastructure::first();
 
@@ -314,63 +313,12 @@ class AiIntelligenceSuiteTest extends TestCase
         $this->assertContains($techActive->id, $techIds);
     }
 
-    public function test_technician_recommendation_returns_the_whole_workforce_as_selectable_candidates(): void
-    {
-        $manager = $this->getManagerUser();
-        $infra = Infrastructure::first();
-
-        $techActive = User::factory()->create([
-            'role' => 'technician',
-            'name' => 'Kamel Ben Salah',
-            'email' => 'kamel.test@aquasecure.tn',
-            'speciality' => 'Électromécanique et Pompage',
-            'status' => 'available',
-        ]);
-
-        $techInactive = User::factory()->create([
-            'role' => 'technician',
-            'name' => 'Inactif Test',
-            'email' => 'inactif.test@aquasecure.tn',
-            'speciality' => 'Électromécanique et Pompage',
-            'status' => 'inactive',
-        ]);
-
-        $response = $this->actingAs($manager)->postJson(route('maintenances.recommend-technicians'), [
-            'type' => 'Corrective',
-            'priority' => 'high',
-            'infrastructure_id' => $infra->id,
-            'description' => 'Révision complète pompe de refoulement',
-        ]);
-
-        $response->assertStatus(200);
-
-        $data = $response->json();
-        $allCandidates = collect($data['recommendations']['all_candidates']);
-
-        // Every technician of the workforce is exposed, not only the AI top 3
-        $this->assertCount(User::technicians()->count(), $allCandidates);
-        $this->assertTrue($allCandidates->contains('id', $techActive->id));
-        $this->assertTrue($allCandidates->contains('id', $techInactive->id));
-
-        // Inactive technicians are listed but flagged as not assignable
-        $inactive = $allCandidates->firstWhere('id', $techInactive->id);
-        $this->assertFalse($inactive['selectable']);
-
-        $active = $allCandidates->firstWhere('id', $techActive->id);
-        $this->assertTrue($active['selectable']);
-
-        // The AI ranking only covers assignable technicians
-        $rankedIds = collect($data['recommendations']['candidate_rankings'])->pluck('technician_id');
-        $this->assertNotContains($techInactive->id, $rankedIds->all());
-    }
-
     public function test_technician_recommendation_sanitizes_fake_technician_ids_from_ai(): void
     {
         $manager = $this->getManagerUser();
         $infra = Infrastructure::first();
 
-        $techReal = User::factory()->create([
-            'role' => 'technician',
+        $techReal = Technicien::create([
             'name' => 'Real Technician',
             'email' => 'real.tech@aquasecure.tn',
             'speciality' => 'Hydraulique générale',
@@ -437,8 +385,7 @@ class AiIntelligenceSuiteTest extends TestCase
             'reference_code' => 'TEST-MAINT-001',
         ]);
 
-        $tech = User::factory()->create([
-            'role' => 'technician',
+        $tech = Technicien::create([
             'name' => 'Sami Trabelsi',
             'email' => 'sami.trabelsi@aquasecure.tn',
             'speciality' => 'Détection de fuites',
@@ -469,8 +416,7 @@ class AiIntelligenceSuiteTest extends TestCase
             'reference_code' => 'TEST-MAINT-002',
         ]);
 
-        $techInactive = User::factory()->create([
-            'role' => 'technician',
+        $techInactive = Technicien::create([
             'name' => 'Inactif Assign Test',
             'email' => 'inactif.assign@aquasecure.tn',
             'speciality' => 'Tuyauterie',

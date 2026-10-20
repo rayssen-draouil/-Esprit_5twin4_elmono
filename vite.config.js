@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/css/enhancements.css', 'resources/css/premium-overrides.css', 'resources/css/signalement.css', 'resources/css/back-zones-alerts.css', 'resources/css/front-zones-alerts.css', 'resources/js/app.js', 'resources/js/zone-map.js', 'resources/js/zones-alerts.js', 'resources/js/front-zones-alerts.js'],
+            input: ['resources/css/app.css', 'resources/css/enhancements.css', 'resources/css/premium-overrides.css', 'resources/css/signalement.css', 'resources/js/app.js'],
             refresh: true,
         }),
         tailwindcss(),

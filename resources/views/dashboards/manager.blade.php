@@ -254,20 +254,56 @@
         <div class="mgr-kpi-value" style="color: #0d9488;">
             {{ $stats['in_progress_count'] }}
         </div>
-        <div class="mgr-kpi-desc">Techniciens actuellement sur site</div>
+        <div class="mgr-kpi-desc">{{ $onSiteTechnicians->count() }} technicien(s) approuvé(s) en intervention</div>
     </div>
 
     <div class="mgr-kpi-card">
         <div class="mgr-kpi-header">
-            <span class="mgr-kpi-title">Validées ce mois</span>
+            <span class="mgr-kpi-title">Validées / terminées ce mois</span>
             <span class="mgr-kpi-icon" style="background: #dcfce7; color: #16a34a;">✓</span>
         </div>
         <div class="mgr-kpi-value" style="color: #16a34a;">
             {{ $stats['completed_month_count'] }}
         </div>
-        <div class="mgr-kpi-desc">Opérations clôturées et archivées</div>
+        <div class="mgr-kpi-desc">Maintenances validées et interventions terminées</div>
     </div>
 </div>
+
+<section class="panel" style="margin-bottom: 24px;">
+    <div class="panel-heading" style="margin-bottom: 14px;">
+        <div>
+            <h2 style="font-size: 16px;">Techniciens approuvés</h2>
+            <p style="font-size: 12px; color: var(--muted);">Comptes techniciens validés et leur activité d’intervention actuelle.</p>
+        </div>
+        <a href="{{ route('techniciens.index') }}" style="font-size: 12px; color: #0d9488; text-decoration: none; font-weight: 600;">
+            Voir le répertoire →
+        </a>
+    </div>
+
+    @if($approvedTechnicians->isEmpty())
+        <div style="padding: 20px; text-align: center; color: var(--muted); font-size: 13px;">
+            Aucun compte technicien approuvé pour le moment.
+        </div>
+    @else
+        <div class="invitations-grid">
+            @foreach($approvedTechnicians as $technician)
+                @php($isOnSite = $onSiteTechnicians->contains('id', $technician->id))
+                <div class="invitation-item">
+                    <div>
+                        <strong style="font-size: 13px; color: #073f4a;">{{ $technician->name }}</strong>
+                        <div style="font-size: 12px; color: var(--muted);">
+                            {{ $technician->speciality ?: 'Spécialité non renseignée' }}
+                            @if($technician->email) · {{ $technician->email }} @endif
+                        </div>
+                    </div>
+                    <span class="badge {{ $isOnSite ? 'badge-info' : 'badge-success' }}" style="font-size: 10px;">
+                        {{ $isOnSite ? 'En intervention' : 'Approuvé' }}
+                    </span>
+                </div>
+            @endforeach
+        </div>
+    @endif
+</section>
 
 {{-- 2. SECTION PRIORITAIRE : Interventions en attente de validation managériale --}}
 <section class="panel" id="section-validations" style="margin-bottom: 28px; border-left: 4px solid #ea580c;">
@@ -580,7 +616,7 @@
             </a>
         </div>
 
-        @if($inProgressMaintenances->isEmpty())
+        @if($inProgressMaintenances->isEmpty() && $inProgressInterventions->isEmpty())
             <div style="padding: 20px; text-align: center; color: var(--muted); font-size: 13px;">
                 Aucune intervention en cours d'exécution.
             </div>
@@ -604,6 +640,30 @@
                     </a>
                 </div>
             @endforeach
+
+            @foreach($inProgressInterventions as $intervention)
+                <div class="invitation-item">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <strong style="color: #073f4a; font-size: 13px;">
+                                {{ $intervention->incident?->type ?? ('Intervention #' . $intervention->id) }}
+                            </strong>
+                            <span class="badge badge-info" style="font-size: 10px;">En cours</span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--ink); margin-top: 2px;">
+                            {{ $intervention->incident?->location ?? 'Lieu non renseigné' }}
+                            · Technicien : <strong>{{ $intervention->technician?->name ?? 'N/D' }}</strong>
+                        </div>
+                        <div style="font-size: 11px; color: var(--muted);">
+                            {{ $intervention->team }}
+                            · Démarrée le {{ $intervention->started_at?->format('d/m/Y à H:i') ?? 'N/D' }}
+                        </div>
+                    </div>
+                    <a href="{{ route('interventions.show', $intervention) }}" class="button button-ghost" style="padding: 6px 10px; font-size: 11px;">
+                        Suivre
+                    </a>
+                </div>
+            @endforeach
         @endif
     </section>
 
@@ -612,14 +672,14 @@
         <div class="panel-heading" style="margin-bottom: 12px;">
             <div>
                 <h2 style="font-size: 16px;">✓ Récemment Validées & Clôturées</h2>
-                <p style="font-size: 12px; color: var(--muted);">Dossiers approuvés par la direction et notifiés par Brevo.</p>
+                <p style="font-size: 12px; color: var(--muted);">Maintenances validées et interventions terminées récemment.</p>
             </div>
             <a href="{{ route('maintenances.index', ['status' => 'completed']) }}" style="font-size: 12px; color: #16a34a; text-decoration: none; font-weight: 600;">
                 Archives →
             </a>
         </div>
 
-        @if($recentlyValidated->isEmpty())
+        @if($recentlyValidated->isEmpty() && $recentlyCompletedInterventions->isEmpty())
             <div style="padding: 20px; text-align: center; color: var(--muted); font-size: 13px;">
                 Aucune intervention clôturée récemment.
             </div>
@@ -642,6 +702,29 @@
                         </div>
                     </div>
                     <a href="{{ route('maintenances.show', $m) }}" class="button button-ghost" style="padding: 6px 10px; font-size: 11px;">
+                        Consulter
+                    </a>
+                </div>
+            @endforeach
+
+            @foreach($recentlyCompletedInterventions as $intervention)
+                <div class="invitation-item">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <strong style="color: #073f4a; font-size: 13px;">
+                                {{ $intervention->incident?->type ?? ('Intervention #' . $intervention->id) }}
+                            </strong>
+                            <span class="badge badge-success" style="font-size: 10px;">✓ Terminée</span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--ink); margin-top: 2px;">
+                            {{ $intervention->incident?->location ?? 'Lieu non renseigné' }}
+                            · Réalisée par <strong>{{ $intervention->technician?->name ?? 'N/D' }}</strong>
+                        </div>
+                        <div style="font-size: 11px; color: var(--muted);">
+                            Terminée le {{ $intervention->completed_at?->format('d/m/Y à H:i') }}
+                        </div>
+                    </div>
+                    <a href="{{ route('interventions.show', $intervention) }}" class="button button-ghost" style="padding: 6px 10px; font-size: 11px;">
                         Consulter
                     </a>
                 </div>

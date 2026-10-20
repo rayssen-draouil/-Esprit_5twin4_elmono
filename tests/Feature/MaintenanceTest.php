@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
+use App\Models\Technicien;
 use App\Models\User;
 use App\Models\Zone;
 use Database\Seeders\InfrastructureMaintenanceSeeder;
@@ -256,27 +257,6 @@ class MaintenanceTest extends TestCase
         $response->assertSee('validated-form');
         $response->assertSee('data-rules=');
         $response->assertSee('validation-feedback');
-    }
-
-    public function test_maintenance_show_relies_on_the_ai_matchmaker_instead_of_a_technician_list(): void
-    {
-        $admin = $this->getAdminUser();
-        $maintenance = Maintenance::first();
-        $this->assertNotNull($maintenance);
-
-        User::factory()->create([
-            'role' => 'technician',
-            'name' => 'Techn. Karim Zouari',
-            'email' => 'k.zouari.extra@sonede.tn',
-            'speciality' => 'Traitement de l’eau',
-            'status' => 'available',
-        ]);
-
-        $response = $this->actingAs($admin)->get(route('maintenances.show', $maintenance));
-
-        $response->assertStatus(200)
-            ->assertDontSee('Techniciens existants')
-            ->assertSee('AI TECHNICIAN MATCHMAKER');
     }
 }
 

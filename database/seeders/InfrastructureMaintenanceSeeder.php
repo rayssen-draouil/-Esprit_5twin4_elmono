@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
+use App\Models\Technicien;
 use App\Models\Zone;
 use Illuminate\Database\Seeder;
 
@@ -49,16 +50,55 @@ class InfrastructureMaintenanceSeeder extends Seeder
         );
 
         // 2. Tunisian Technicians (SONEDE & DGBGTH engineers & field technicians)
-        // Le technicien est un rôle applicatif porté par la table `users`.
-        $techTrabelsi = TechnicianSeeder::ensureTechnician(TechnicianSeeder::TECHNICIANS['m.trabelsi@sonede.tn']);
+        $techTrabelsi = Technicien::firstOrCreate(
+            ['email' => 'm.trabelsi@sonede.tn'],
+            [
+                'name' => 'Ing. Mohamed Trabelsi',
+                'phone' => '+216 71 888 101',
+                'speciality' => 'Électromécanique & Groupes Motopompes (SONEDE)',
+                'status' => 'available',
+            ]
+        );
 
-        $techBenSalem = TechnicianSeeder::ensureTechnician(TechnicianSeeder::TECHNICIANS['a.bensalem@agriculture.gov.tn']);
+        $techBenSalem = Technicien::firstOrCreate(
+            ['email' => 'a.bensalem@agriculture.gov.tn'],
+            [
+                'name' => 'Ing. Ahmed Ben Salem',
+                'phone' => '+216 78 450 200',
+                'speciality' => 'Génie Civil & Auscultation Barrages (DGBGTH)',
+                'status' => 'available',
+            ]
+        );
 
-        $techMansouri = TechnicianSeeder::ensureTechnician(TechnicianSeeder::TECHNICIANS['y.mansouri@sonede.tn']);
+        $techMansouri = Technicien::firstOrCreate(
+            ['email' => 'y.mansouri@sonede.tn'],
+            [
+                'name' => 'Techn. Youssef Mansouri',
+                'phone' => '+216 75 290 300',
+                'speciality' => 'Dessalement d\'Eau de Mer & Osmose Inverse (SONEDE Zarat)',
+                'status' => 'busy',
+            ]
+        );
 
-        $techZouari = TechnicianSeeder::ensureTechnician(TechnicianSeeder::TECHNICIANS['k.zouari@sonede.tn']);
+        $techZouari = Technicien::firstOrCreate(
+            ['email' => 'k.zouari@sonede.tn'],
+            [
+                'name' => 'Techn. Karim Zouari',
+                'phone' => '+216 72 285 400',
+                'speciality' => 'Réseaux de Distribution & Détection de Fuites (SONEDE Cap Bon)',
+                'status' => 'available',
+            ]
+        );
 
-        $techKhemiri = TechnicianSeeder::ensureTechnician(TechnicianSeeder::TECHNICIANS['f.khemiri@sonede.tn']);
+        $techKhemiri = Technicien::firstOrCreate(
+            ['email' => 'f.khemiri@sonede.tn'],
+            [
+                'name' => 'Ing. Fatma Khemiri',
+                'phone' => '+216 71 500 600',
+                'speciality' => 'Automatisme SCADA & Télémétrie Qualité (SONEDE Ghdir El Golla)',
+                'status' => 'available',
+            ]
+        );
 
         // 3. Tunisian Water Infrastructures (SONEDE & DGBGTH)
         $infraGhdir = Infrastructure::updateOrCreate(

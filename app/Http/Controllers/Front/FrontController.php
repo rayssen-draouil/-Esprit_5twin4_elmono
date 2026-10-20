@@ -5,18 +5,18 @@ namespace App\Http\Controllers\Front;
 use App\Http\Controllers\Controller;
 use App\Models\Alert;
 use App\Http\Requests\ReportMalfunctionRequest;
+use App\Models\Equipement;
 use App\Models\Financement;
 use App\Models\Incident;
 use App\Models\Infrastructure;
+use App\Models\Intervention;
 use App\Models\Maintenance;
 use App\Models\Project;
 use App\Models\Signalement;
+use App\Models\Technicien;
 use App\Models\Zone;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -35,37 +35,7 @@ class FrontController extends Controller
 
     public function home(): View
     {
-        $ttl = max(30, (int) config('aquasecure.cache_ttl', 120));
-
-        $criticalAlerts = Cache::remember('front.home.critical', $ttl, fn () => Alert::query()
-            ->with('zone:id,name')
-            ->whereNull('resolved_at')
-            ->where(fn ($query) => $query->where('severity', 'critical')->orWhere('ai_severity', 'critical'))
-            ->latest()
-            ->limit(3)
-            ->get()
-            ->map(fn (Alert $alert) => [
-                'type' => $alert->type,
-                'zone' => $alert->zone->name ?? 'Zone non définie',
-                'date' => $alert->created_at?->format('d/m/Y H:i'),
-                'url' => route('front.alerts.show', $alert),
-            ])
-            ->all());
-
-        $publicStats = Cache::remember('front.home.stats', $ttl, fn () => [
-            'active_alerts' => Alert::whereNull('resolved_at')->count(),
-            'zones' => Zone::count(),
-            'resolved_month' => Alert::whereNotNull('resolved_at')
-                ->where('resolved_at', '>=', now()->startOfMonth())
-                ->count(),
-            'critical' => Alert::whereNull('resolved_at')
-                ->where(fn ($query) => $query->where('severity', 'critical')->orWhere('ai_severity', 'critical'))
-                ->count(),
-        ]);
-
         return view('front.home', $this->shared() + [
-            'criticalAlerts' => $criticalAlerts,
-            'publicStats' => $publicStats,
             'featuredProjects' => $this->projectsData(),
             'networkStatus' => [
                 ['icon' => '◉', 'label' => "Qualité de l'eau", 'value' => '98.7', 'unit' => '%', 'status' => 'Excellent', 'change' => '+2.4 %', 'tone' => 'success'],
@@ -86,6 +56,73 @@ class FrontController extends Controller
     public function services(): View
     {
         return view('front.services', $this->shared());
+    }
+
+    public function operations(): View
+    {
+        $periodEnd = now();
+        $periodStart = $periodEnd->copy()->subDays(30);
+        $publicStatuses = [
+            'planned' => ['label' => 'Planifiées', 'description' => 'Interventions créées durant la période'],
+            'in_progress' => ['label' => 'En cours', 'description' => 'Interventions créées durant la période'],
+            'completed' => ['label' => 'Terminées', 'description' => 'Interventions créées durant la période'],
+        ];
+        $statusCounts = Intervention::query()
+            ->whereBetween('created_at', [$periodStart, $periodEnd])
+            ->whereIn('status', array_keys($publicStatuses))
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $operationStatuses = collect($publicStatuses)
+            ->map(fn (array $status, string $key): array => $status + [
+                'key' => $key,
+                'count' => (int) ($statusCounts[$key] ?? 0),
+            ])
+            ->values();
+        $activeInterventionsCount = Intervention::query()
+            ->where('status', 'in_progress')
+            ->count();
+
+        $specialties = Technicien::withTechnicianAccount()
+            ->whereNotNull('speciality')
+            ->whereRaw("TRIM(speciality) != ''")
+            ->select('speciality')
+            ->distinct()
+            ->orderBy('speciality')
+            ->pluck('speciality');
+
+        $equipmentTypes = Equipement::query()
+            ->whereNotNull('type')
+            ->whereRaw("TRIM(type) != ''")
+            ->select('type')
+            ->distinct()
+            ->orderBy('type')
+            ->pluck('type')
+            ->map(function (string $type): array {
+                $normalizedType = Str::lower($type);
+                $image = match (true) {
+                    Str::contains($normalizedType, ['vanne', 'coupure', 'raccord']) => 'Vanne de coupure DN50.webp',
+                    Str::contains($normalizedType, ['inspection', 'canalisation']) => 'Caméra d’inspection de canalisation.webp',
+                    Str::contains($normalizedType, ['détection', 'fuite']) => 'Détecteur acoustique de fuites.webp',
+                    Str::contains($normalizedType, ['analyse', 'qualité', 'contamination']) => 'Kit d’analyse de la qualité de l’eau.webp',
+                    Str::contains($normalizedType, ['sécurité', 'protection']) => 'Kit de protection individuelle.webp',
+                    Str::contains($normalizedType, ['mesure', 'électrique']) => 'Multimètre numérique.webp',
+                    Str::contains($normalizedType, ['pompage', 'pompe']) => 'Pompe submersible.webp',
+                    default => null,
+                };
+
+                return ['name' => $type, 'image' => $image];
+            });
+
+        return view('front.operations', $this->shared() + compact(
+            'operationStatuses',
+            'activeInterventionsCount',
+            'periodStart',
+            'periodEnd',
+            'specialties',
+            'equipmentTypes',
+        ));
     }
 
     public function projects(): View
@@ -118,252 +155,40 @@ class FrontController extends Controller
         return view('front.contact', $this->shared());
     }
 
-    public function zones(Request $request): View
+    public function zones(): View
     {
-        $sortMap = [
-            'risk' => ['ai_risk_score', 'desc'],
-            'score' => ['ai_risk_score', 'desc'],
-            'incidents' => ['incidents_count', 'desc'],
-            'alerts' => ['alerts_count', 'desc'],
-            'analyzed' => ['ai_analyzed_at', 'desc'],
-            'last_alert' => ['alerts_max_created_at', 'desc'],
-            'name' => ['name', 'asc'],
-        ];
-        $sortKey = $request->string('sort')->toString();
-        if (! array_key_exists($sortKey, $sortMap)) {
-            $sortKey = 'name';
-        }
+        $zones = Zone::withCount(['infrastructures', 'incidents'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn($z) => [
+                'name' => $z->name,
+                'address' => $z->address,
+                'description' => $z->description,
+                'risk' => $z->risk_label,
+                'riskLevel' => $z->risk_level,
+                'infrastructures' => $z->infrastructures_count,
+                'incidents' => $z->incidents_count,
+            ])->toArray();
 
-        $applyFilters = fn ($query) => $query
-            ->when($request->filled('q'), fn ($q) => $q->where(fn ($w) => $w
-                ->where('name', 'like', '%'.$this->likeTerm($request->string('q')).'%')
-                ->orWhere('address', 'like', '%'.$this->likeTerm($request->string('q')).'%')))
-            ->when($request->filled('region'), fn ($q) => $q->where('address', 'like', '%'.$this->likeTerm($request->string('region')).'%'))
-            ->when($request->input('geo') === 'with', fn ($q) => $q->whereNotNull('latitude')->whereNotNull('longitude'))
-            ->when($request->input('geo') === 'without', fn ($q) => $q->whereNull('latitude'));
-
-        $zones = Zone::withCount(['infrastructures', 'incidents', 'alerts'])
-            ->withMax('alerts', 'created_at')
-            ->tap($applyFilters)
-            ->when($request->filled('risk'), fn ($q) => $q->where('risk_level', $request->string('risk')))
-            ->orderBy(...$sortMap[$sortKey])
-            ->paginate(12)
-            ->withQueryString();
-
-        $zones->setCollection($zones->getCollection()->map(fn ($z) => [
-            'id' => $z->id,
-            'name' => $z->name,
-            'address' => $z->address,
-            'description' => $z->description,
-            'image' => $z->image_path ? asset('storage/'.$z->image_path) : null,
-            'risk' => $z->risk_label,
-            'riskLevel' => $z->risk_level,
-            'aiRiskLevel' => $z->ai_risk_level,
-            'aiScore' => $z->ai_risk_score,
-            'aiAnalyzedAt' => $z->ai_analyzed_at?->format('d/m/Y'),
-            'infrastructures' => $z->infrastructures_count,
-            'incidents' => $z->incidents_count,
-            'alertsCount' => $z->alerts_count,
-            'lastAlertAt' => $z->alerts_max_created_at,
-            'lastAlert' => $z->alerts_max_created_at
-                ? Carbon::parse($z->alerts_max_created_at)->diffForHumans()
-                : null,
-            'hasCoordinates' => $z->hasCoordinates(),
-            'url' => route('front.zones.show', $z),
-        ]));
-
-        $riskCounts = $applyFilters(Zone::query())
-            ->groupBy('risk_level')
-            ->selectRaw('risk_level, COUNT(*) as total')
-            ->pluck('total', 'risk_level');
-
-        $kpis = [
-            'total' => Zone::count(),
-            'highRisk' => Zone::where(fn ($q) => $q->where('risk_level', 'high')->orWhere('ai_risk_level', 'critical'))->count(),
-            'avgScore' => Zone::whereNotNull('ai_risk_score')->avg('ai_risk_score'),
-            'analyzed' => Zone::whereNotNull('ai_analyzed_at')->count(),
-        ];
-
-        $regions = Zone::query()
-            ->pluck('address')
-            ->filter()
-            ->map(function ($address) {
-                $parts = explode(',', (string) $address);
-
-                return trim((string) end($parts));
-            })
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
-
-        return view('front.zones.index', $this->shared() + [
-            'zones' => $zones,
-            'kpis' => $kpis,
-            'riskCounts' => $riskCounts,
-            'regions' => $regions,
-            'sortKey' => $sortKey,
-        ]);
+        return view('front.zones.index', $this->shared() + ['zones' => $zones]);
     }
 
-    public function alerts(Request $request): View|JsonResponse
+    public function alerts(): View
     {
-        $sortKey = $request->string('sort')->toString();
-        if (! in_array($sortKey, ['date', 'priority', 'oldest'], true)) {
-            $sortKey = 'priority';
-        }
-
-        $applyFilters = function ($query, array $skip = []) use ($request) {
-            $query
-                ->when($request->filled('q') && ! in_array('q', $skip), function ($q) use ($request) {
-                    $term = '%'.$this->likeTerm($request->string('q')).'%';
-                    $q->where(fn ($w) => $w->where('type', 'like', $term)->orWhere('message', 'like', $term));
-                })
-                ->when($request->filled('severity') && ! in_array('severity', $skip), fn ($q) => $q->where('severity', $request->string('severity')))
-                ->when($request->filled('zone') && ! in_array('zone', $skip), fn ($q) => $q->where('zone_id', $request->integer('zone')))
-                ->when($request->input('status') === 'open' && ! in_array('status', $skip), fn ($q) => $q->whereNull('acknowledged_at')->whereNull('resolved_at'))
-                ->when($request->input('status') === 'acknowledged' && ! in_array('status', $skip), fn ($q) => $q->whereNotNull('acknowledged_at')->whereNull('resolved_at'))
-                ->when($request->input('status') === 'resolved' && ! in_array('status', $skip), fn ($q) => $q->whereNotNull('resolved_at'));
-
-            if (in_array('period', $skip)) {
-                return $query;
-            }
-
-            $from = (string) $request->input('from');
-            $to = (string) $request->input('to');
-            if (! in_array('from', $skip) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
-                $query->where('created_at', '>=', Carbon::parse($from)->startOfDay());
-            }
-            if (! in_array('to', $skip) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
-                $query->where('created_at', '<=', Carbon::parse($to)->endOfDay());
-            }
-            if (! $request->filled('from') && ! $request->filled('to')) {
-                $query
-                    ->when($request->input('period') === 'today', fn ($q) => $q->where('created_at', '>=', now()->startOfDay()))
-                    ->when($request->input('period') === '7d', fn ($q) => $q->where('created_at', '>=', now()->subDays(7)))
-                    ->when($request->input('period') === '30d', fn ($q) => $q->where('created_at', '>=', now()->subDays(30)));
-            }
-
-            return $query;
-        };
-
-        $kpis = [
-            'total' => Alert::count(),
-            'open' => Alert::whereNull('acknowledged_at')->whereNull('resolved_at')->count(),
-            'critical' => Alert::where(fn ($q) => $q->where('severity', 'critical')->orWhere('ai_severity', 'critical'))->count(),
-            'last24h' => Alert::where('created_at', '>=', now()->subDay())->count(),
-        ];
-
-        $chart = $this->alertsChart($applyFilters);
-
-        if ($request->boolean('live')) {
-            $key = 'front-alerts-live:'.request()->ip();
-            $hits = Cache::increment($key);
-            if ($hits === 1) {
-                Cache::put($key, 1, 60);
-            }
-            if ($hits > 30) {
-                abort(429, 'Trop de requêtes, réessayez dans une minute.');
-            }
-
-            $since = $request->integer('since');
-            $fresh = $applyFilters(Alert::query());
-            $newCount = $since > 0
-                ? (clone $fresh)->where('created_at', '>', now()->setTimestamp($since))->count()
-                : 0;
-
-            $latest = (clone $fresh)->with('zone')->latest()->limit(5)->get()->map(fn ($a) => [
+        $alerts = Alert::with(['zone', 'incident'])
+            ->latest()
+            ->get()
+            ->map(fn($a) => [
                 'type' => $a->type,
-                'message' => Str::limit($a->message, 70),
+                'message' => $a->message,
                 'zone' => $a->zone->name ?? 'Zone non définie',
                 'severity' => $a->severity_label,
                 'severityLevel' => $a->severity,
-                'status' => $a->status_label,
-                'statusLevel' => $a->status(),
+                'status' => $a->read_at ? 'Lue' : 'Non lue',
                 'date' => $a->created_at?->format('d M Y H:i'),
-            ]);
+            ])->toArray();
 
-            return response()->json([
-                'success' => true,
-                'new_count' => $newCount,
-                'kpis' => $kpis,
-                'latest' => $latest,
-                'updated_at' => now()->toIso8601String(),
-            ])->header('Cache-Control', 'no-store');
-        }
-
-        $severityCounts = $applyFilters(Alert::query(), ['severity'])
-            ->groupBy('severity')
-            ->selectRaw('severity, COUNT(*) as total')
-            ->pluck('total', 'severity');
-
-        $alerts = $applyFilters(Alert::with(['zone', 'incident']));
-        if ($sortKey === 'priority') {
-            $alerts->orderByRaw("CASE severity WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC")->latest();
-        } elseif ($sortKey === 'oldest') {
-            $alerts->oldest();
-        } else {
-            $alerts->latest();
-        }
-
-        $alerts = $alerts->paginate(12)->withQueryString();
-        $alerts->setCollection($alerts->getCollection()->map(fn ($a) => [
-            'type' => $a->type,
-            'message' => $a->message,
-            'zone' => $a->zone->name ?? 'Zone non définie',
-            'zoneId' => $a->zone_id,
-            'zoneImage' => $a->zone?->image_path ? asset('storage/'.$a->zone->image_path) : null,
-            'severity' => $a->severity_label,
-            'severityLevel' => $a->severity,
-            'status' => $a->status_label,
-            'statusLevel' => $a->status(),
-            'aiSeverity' => $a->ai_severity,
-            'date' => $a->created_at?->format('d/m/Y H:i'),
-            'url' => route('front.alerts.show', $a),
-        ]));
-
-        return view('front.alerts.index', $this->shared() + [
-            'alerts' => $alerts,
-            'zones' => Zone::orderBy('name')->get(['id', 'name']),
-            'kpis' => $kpis,
-            'severityCounts' => $severityCounts,
-            'chart' => $chart,
-            'sortKey' => $sortKey,
-        ]);
-    }
-
-    private function alertsChart(callable $applyFilters): array
-    {
-        $rows = $applyFilters(Alert::query(), ['period', 'from', 'to'])
-            ->where('created_at', '>=', now()->subDays(29)->startOfDay())
-            ->pluck('created_at');
-
-        $byDay = [];
-        foreach ($rows as $createdAt) {
-            $key = $createdAt->format('Y-m-d');
-            $byDay[$key] = ($byDay[$key] ?? 0) + 1;
-        }
-
-        $labels = [];
-        $counts = [];
-        for ($i = 29; $i >= 0; $i--) {
-            $key = now()->subDays($i)->format('Y-m-d');
-            $labels[] = $key;
-            $counts[] = $byDay[$key] ?? 0;
-        }
-
-        return [
-            'labels' => $labels,
-            'counts' => $counts,
-            'total' => array_sum($counts),
-            'from' => now()->subDays(29)->format('d/m/Y'),
-        ];
-    }
-
-    /** Échappe les jokers LIKE saisis par l'utilisateur. */
-    private function likeTerm($value): string
-    {
-        return str_replace(['%', '_'], ['\%', '\_'], (string) $value);
+        return view('front.alerts.index', $this->shared() + ['alerts' => $alerts]);
     }
 
     public function incidents(): View
@@ -408,7 +233,7 @@ class FrontController extends Controller
             );
         }
 
-        $signalement = Signalement::create([
+        Signalement::create([
             'user_id' => auth()->id(),
             'reporter_name' => auth()->user()->name,
             'reporter_email' => auth()->user()->email,
@@ -421,9 +246,7 @@ class FrontController extends Controller
             'reported_at' => !empty($validated['incident_date']) ? $validated['incident_date'] : now(),
         ]);
 
-        return redirect()
-            ->route('front.track', ['ref' => $signalement->tracking_token])
-            ->with('success', 'Votre signalement est enregistré. Conservez votre référence de suivi : '.$signalement->tracking_token.'.');
+        return redirect()->route('front.incidents.index')->with('success', 'Signalement envoyé. Il sera vérifié par nos équipes.');
     }
 
     public function showIncident(string $incident): View
