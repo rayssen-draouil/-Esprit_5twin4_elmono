@@ -25,7 +25,7 @@
         @error('status')<small class="field-error">{{ $message }}</small>@enderror
     </label>
     <label>Date de début
-        <input type="date" name="start_date" value="{{ old('start_date', isset($project?->start_date) ? $project->start_date?->format('Y-m-d') : '') }}" data-label="Date de début">
+        <input type="date" name="start_date" value="{{ old('start_date', isset($project?->start_date) ? $project->start_date?->format('Y-m-d') : '') }}" data-label="Date de début" @if(!isset($project)) min="{{ now()->format('Y-m-d') }}" @endif>
         @error('start_date')<small class="field-error">{{ $message }}</small>@enderror
     </label>
     <label>Date de fin

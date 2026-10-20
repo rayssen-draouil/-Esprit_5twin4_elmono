@@ -20,6 +20,11 @@ class Project extends Model
         'end_date',
         'status',
         'progress',
+        'user_id',
+        'validation_status',
+        'validation_comment',
+        'validated_by',
+        'validated_at',
     ];
 
     protected function casts(): array
@@ -29,7 +34,18 @@ class Project extends Model
             'start_date' => 'date',
             'end_date' => 'date',
             'progress' => 'integer',
+            'validated_at' => 'datetime',
         ];
+    }
+
+    public function decisionHistories(): HasMany
+    {
+        return $this->hasMany(DecisionHistory::class, 'resource_id', 'id')->where('resource_type', 'project');
+    }
+
+    public function validator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validated_by');
     }
 
     public function financements(): HasMany
@@ -40,5 +56,15 @@ class Project extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function budgetRevisions(): HasMany
+    {
+        return $this->hasMany(ProjectBudgetRevision::class, 'project_id', 'id');
+    }
+
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(ProjectExpense::class, 'project_id', 'id');
     }
 }

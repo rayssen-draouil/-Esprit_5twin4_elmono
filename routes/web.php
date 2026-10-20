@@ -1,26 +1,30 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Back\AiIntelligenceSuiteController;
 use App\Http\Controllers\Back\AlertController;
 use App\Http\Controllers\Back\BackController;
+use App\Http\Controllers\Back\FinancialDashboardController;
 use App\Http\Controllers\Back\MaintenanceIntelligenceController;
+use App\Http\Controllers\Back\PilotageController;
 use App\Http\Controllers\Back\ZoneController;
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\FinancementController;
 use App\Http\Controllers\Front\FrontController;
 use App\Http\Controllers\InfrastructureController;
 use App\Http\Controllers\InterventionController;
 use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\MaintenanceInvitationController;
-use App\Http\Controllers\ProjectController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PasswordResetController;
-use App\Http\Controllers\EmailVerificationController;
-use App\Http\Controllers\TwoFactorController;
-use App\Http\Controllers\TechnicienController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectDoctorController;
 use App\Http\Controllers\Technician\TechnicianInterventionController;
+use App\Http\Controllers\TechnicienController;
+use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UserController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -56,6 +60,26 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile/two-factor/recovery-codes/regenerate', [TwoFactorController::class, 'regenerateRecoveryCodes'])->name('two-factor.recovery-codes.regenerate');
     Route::get('/dashboard/manager', [DashboardController::class, 'manager'])->middleware('role:manager,gestionnaire')->name('manager.dashboard');
     Route::get('/dashboard/citizen', [DashboardController::class, 'citizen'])->middleware('role:citizen,citoyen')->name('citizen.dashboard');
+
+    // Notifications internes
+    Route::put('/notifications/{notification}/read', function ($notification) {
+        $notification = DB::table('notifications')->where('id', $notification)->where('notifiable_type', 'App\Models\User')->where('notifiable_id', auth()->id())->first();
+        if ($notification) {
+            DB::table('notifications')->where('id', $notification->id)->update(['read_at' => now()]);
+        }
+
+        return back();
+    })->name('notifications.read');
+
+    Route::put('/notifications/read-all', function () {
+        DB::table('notifications')
+            ->where('notifiable_type', 'App\Models\User')
+            ->where('notifiable_id', auth()->id())
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return back();
+    })->name('notifications.read-all');
 });
 
 Route::get('/', [FrontController::class, 'home'])->name('home');
@@ -92,6 +116,8 @@ Route::middleware(['auth', 'role:admin,manager,gestionnaire'])->prefix('back')->
     Route::get('/projects', [BackController::class, 'projects'])->name('projects');
     Route::get('/funding', [BackController::class, 'funding'])->name('funding');
     Route::get('/users', [BackController::class, 'users'])->name('users');
+    Route::get('/financial/dashboard', [FinancialDashboardController::class, '__invoke'])->name('financial.dashboard');
+    Route::get('/pilotage', [PilotageController::class, '__invoke'])->name('pilotage');
     Route::resource('zones', ZoneController::class);
     Route::resource('alerts', AlertController::class);
 });
@@ -142,9 +168,22 @@ Route::middleware(['auth', 'verified', 'role:admin,manager,gestionnaire'])->pref
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
         ->names('projects');
 
+    Route::post('/projects/{project}/submit', [ProjectController::class, 'submit'])->name('projects.submit');
+    Route::post('/projects/{project}/decide', [ProjectController::class, 'decide'])->name('projects.decide');
+
+    // Project Doctor — chatbot IA d'analyse de projets
+    Route::post('/projects/doctor/message', [ProjectDoctorController::class, 'message'])
+        ->middleware('throttle:30,1')
+        ->name('projects.doctor.message');
+    Route::get('/projects/doctor/status', [ProjectDoctorController::class, 'status'])
+        ->name('projects.doctor.status');
+
     Route::resource('financements', FinancementController::class)
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
         ->names('financements');
+
+    Route::post('/financements/{financement}/submit', [FinancementController::class, 'submit'])->name('financements.submit');
+    Route::post('/financements/{financement}/decide', [FinancementController::class, 'decide'])->name('financements.decide');
 
     Route::resource('interventions', InterventionController::class)
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])

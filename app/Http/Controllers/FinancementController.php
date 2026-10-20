@@ -2,10 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DecideFinancementRequest;
 use App\Http\Requests\StoreFinancementRequest;
+use App\Http\Requests\SubmitFinancementRequest;
 use App\Http\Requests\UpdateFinancementRequest;
+use App\Models\DecisionHistory;
 use App\Models\Financement;
 use App\Models\Project;
+use App\Models\User;
+use App\Notifications\FinancementDecision;
+use App\Notifications\FinancementSubmitted;
+use App\Services\FinancementCoverageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,14 +53,25 @@ class FinancementController extends Controller
 
     public function store(StoreFinancementRequest $request): RedirectResponse
     {
-        $financement = $request->user()->financements()->create($request->validated());
+        $financement = $request->user()->financements()->create(array_merge($request->validated(), [
+            'validation_status' => 'draft',
+        ]));
 
-        return redirect()->route('financements.index')->with('success', 'Financement ajouté avec succès.');
+        $this->recordDecision($financement, null, 'draft', 'submit', null);
+
+        return redirect()->route('financements.show', $financement)->with('success', 'Financement créé en brouillon.');
     }
 
     public function show(Financement $financement): View
     {
-        return view('financements.show', ['financement' => $financement->load(['project', 'user'])]);
+        $financement->load(['project', 'user', 'decisionHistories.user', 'validator']);
+
+        $coverage = FinancementCoverageService::calculate($financement);
+
+        return view('financements.show', [
+            'financement' => $financement,
+            'coverage' => $coverage,
+        ]);
     }
 
     public function edit(Financement $financement): View
@@ -76,5 +94,96 @@ class FinancementController extends Controller
         $financement->delete();
 
         return redirect()->route('financements.index')->with('success', 'Financement supprimé avec succès.');
+    }
+
+    /**
+     * Soumettre un financement pour validation (Gestionnaire)
+     */
+    public function submit(SubmitFinancementRequest $request, string $id): RedirectResponse
+    {
+        $financement = Financement::findOrFail($id);
+
+        if ($financement->user_id !== $request->user()->id) {
+            return back()->with('error', 'Vous ne pouvez soumettre que vos propres financements.');
+        }
+
+        $oldStatus = $financement->validation_status;
+
+        if (! in_array($oldStatus, ['draft', 'changes_requested'], true)) {
+            return back()->with('error', 'Ce financement ne peut pas être soumis dans son état actuel.');
+        }
+
+        $financement->update([
+            'validation_status' => 'pending_approval',
+            'validation_comment' => null,
+            'validated_by' => null,
+            'validated_at' => null,
+            'resubmitted_after_changes_requested' => $oldStatus === 'changes_requested',
+        ]);
+
+        $comment = $request->string('comment');
+        $this->recordDecision($financement, $oldStatus, 'pending_approval', 'submit', $comment);
+
+        User::where('role', 'admin')->each(fn ($admin) => $admin->notify(new FinancementSubmitted($financement, $comment)));
+
+        return redirect()->route('financements.show', $financement)->with('success', 'Financement soumis pour validation.');
+    }
+
+    /**
+     * Décision de l'Admin sur un financement (approuver, demander corrections, rejeter)
+     */
+    public function decide(DecideFinancementRequest $request, string $id): RedirectResponse
+    {
+        $financement = Financement::findOrFail($id);
+
+        if ($financement->validation_status !== 'pending_approval') {
+            return back()->with('error', 'Ce financement n\'est pas en attente de validation.');
+        }
+
+        if ($financement->user_id === $request->user()->id) {
+            return back()->with('error', 'Vous ne pouvez pas valider votre propre financement.');
+        }
+
+        $oldStatus = $financement->validation_status;
+        $action = $request->string('action');
+        $comment = $request->string('comment');
+        $newStatus = $request->getNewStatus();
+
+        $financement->update([
+            'validation_status' => $newStatus,
+            'validation_comment' => $comment,
+            'validated_by' => $request->user()->id,
+            'validated_at' => now(),
+            'resubmitted_after_changes_requested' => false,
+        ]);
+
+        $this->recordDecision($financement, $oldStatus, $newStatus, $request->getActionType(), $comment);
+
+        $financement->user->notify(new FinancementDecision($financement, $action, $comment, $request->user()->name));
+
+        $message = match ($action) {
+            'approve' => 'Financement approuvé.',
+            'request_changes' => 'Demande de corrections envoyée.',
+            'reject' => 'Financement rejeté.',
+            default => 'Décision enregistrée.',
+        };
+
+        return redirect()->route('financements.show', $financement)->with('success', $message);
+    }
+
+    /**
+     * Enregistre une entrée dans l'historique des décisions
+     */
+    private function recordDecision(Financement $financement, ?string $oldStatus, string $newStatus, string $actionType, ?string $comment): void
+    {
+        DecisionHistory::create([
+            'resource_type' => 'financement',
+            'resource_id' => $financement->id,
+            'user_id' => auth()->id(),
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'comment' => $comment,
+            'action_type' => $actionType,
+        ]);
     }
 }
