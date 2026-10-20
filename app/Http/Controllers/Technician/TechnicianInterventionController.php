@@ -268,7 +268,42 @@ class TechnicianInterventionController extends Controller
 
             return redirect()
                 ->route('technicien.interventions.show', $maintenance)
-                ->with('success', "Votre rapport a été soumis avec succès ! L'opération est maintenant « En attente de validation » par le gestionnaire.");
+                ->with('success', "Intervention confirmée et achevée avec succès ! Le statut est désormais « Terminée & Validée » (Étape 3/3). La santé de l'ouvrage a été actualisée et le gestionnaire a été notifié par email et notification.");
+        } catch (\InvalidArgumentException|\DomainException $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Request a prolongation/postponement of the intervention.
+     */
+    public function prolong(Request $request, Maintenance $maintenance): RedirectResponse
+    {
+        $technician = $this->getTechnician();
+
+        if (!$technician || (int) $maintenance->technician_id !== (int) $technician->id) {
+            abort(403, "Accès interdit : Vous n'êtes pas le technicien affecté à cette opération.");
+        }
+
+        $validated = $request->validate([
+            'days' => ['required', 'integer', 'min:1', 'max:60'],
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ], [
+            'days.required' => "Veuillez indiquer le nombre de jours supplémentaires.",
+            'days.min' => "La prolongation doit être d'au moins 1 jour.",
+            'reason.required' => "Veuillez expliquer la raison de ce report pour le gestionnaire.",
+            'reason.min' => "Le motif doit comporter au moins 5 caractères.",
+        ]);
+
+        try {
+            $this->lifecycleService->prolongIntervention($maintenance, $technician, (int) $validated['days'], $validated['reason']);
+
+            return redirect()
+                ->route('technicien.interventions.show', $maintenance)
+                ->with('success', "Demande de prolongation enregistrée (+{$validated['days']} jours). La date d'intervention a été décalée et le gestionnaire a été prévenu.");
         } catch (\InvalidArgumentException|\DomainException $e) {
             return redirect()
                 ->back()

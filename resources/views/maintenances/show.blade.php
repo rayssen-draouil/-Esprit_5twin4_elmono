@@ -122,6 +122,11 @@
             <span class="badge {{ $maintenance->priority_badge_class }}" style="font-size: 13px; padding: 4px 10px;">
                 Priorité {{ $maintenance->priority_label }}
             </span>
+            @if($maintenance->prolonged_at)
+                <span class="badge badge-warning" style="font-size: 13px; padding: 4px 10px;">
+                    ⏳ Prolongée (+{{ $maintenance->prolongation_days }}j)
+                </span>
+            @endif
         </h1>
         <p style="color: var(--muted); margin: 0; font-size: 13px;">
             Prévue le {{ $maintenance->scheduled_at ? $maintenance->scheduled_at->format('d/m/Y à H:i') : 'Date non fixée' }}
@@ -206,6 +211,24 @@
         </div>
     @endif
 </div>
+
+{{-- Prolongation Alert Banner --}}
+@if($maintenance->prolonged_at)
+    <div style="background: #fffbeb; border: 1px solid #fde68a; border-left: 5px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.08);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <strong style="color: #b45309; font-size: 14px;">⏳ Échéance reportée de {{ $maintenance->prolongation_days }} jour(s) par le technicien</strong>
+                <span style="color: #92400e; font-size: 13px; display: block; margin-top: 3px;">
+                    Nouvelle date planifiée : <strong>{{ $maintenance->scheduled_at ? $maintenance->scheduled_at->format('d/m/Y') : 'Non définie' }}</strong>
+                    @if($maintenance->prolongation_reason)
+                        — Motif : « <em>{{ $maintenance->prolongation_reason }}</em> »
+                    @endif
+                </span>
+            </div>
+            <span class="badge badge-warning" style="font-size: 12px;">+{{ $maintenance->prolongation_days }} jours</span>
+        </div>
+    </div>
+@endif
 
 {{-- Main Details Grid --}}
 <div class="detail-grid">

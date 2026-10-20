@@ -152,4 +152,5 @@ Route::middleware(['auth', 'role:technician,admin'])->prefix('technicien')->name
     Route::post('/interventions/{intervention}/reponse', [TechnicianInterventionController::class, 'respondToIntervention'])->name('interventions.respond');
     Route::get('/interventions/{maintenance}', [TechnicianInterventionController::class, 'show'])->name('interventions.show');
     Route::post('/interventions/{maintenance}/complete', [TechnicianInterventionController::class, 'submitCompletion'])->name('interventions.complete');
+    Route::post('/interventions/{maintenance}/prolong', [TechnicianInterventionController::class, 'prolong'])->name('interventions.prolong');
 });

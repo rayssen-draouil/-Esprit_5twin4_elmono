@@ -283,6 +283,29 @@ class TechnicianAssignmentInvitationService
                 ->where('status', MaintenanceAssignmentInvitation::STATUS_PENDING)
                 ->update(['status' => MaintenanceAssignmentInvitation::STATUS_CANCELLED]);
 
+            // Dispatch in-app notification & transactional email to the manager
+            $managers = collect();
+            if ($invitation->manager_id && ($m = User::find($invitation->manager_id))) {
+                $managers->push($m);
+            }
+            if ($managers->isEmpty()) {
+                $managers = User::whereIn('role', ['manager', 'gestionnaire', 'admin'])->get();
+            }
+
+            foreach ($managers as $mgr) {
+                try {
+                    $mgr->notify(new \App\Notifications\MaintenanceStatusNotification($maintenance, 'accepted', $technician));
+                } catch (\Throwable $e) {
+                    Log::warning('Failed sending in-app notification for accepted maintenance: ' . $e->getMessage());
+                }
+
+                try {
+                    $this->brevoService->sendTechnicianAcceptedNotificationToManager($maintenance, $technician, $mgr);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed sending email to manager on technician acceptance: ' . $e->getMessage());
+                }
+            }
+
             Log::info('Technician accepted maintenance invitation', [
                 'invitation_id' => $invitation->id,
                 'maintenance_id' => $maintenance->id,

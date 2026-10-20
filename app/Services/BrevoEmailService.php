@@ -574,4 +574,203 @@ HTML;
 </html>
 HTML;
     }
+
+    /**
+     * Send email notification to manager when technician accepts an assignment.
+     */
+    public function sendTechnicianAcceptedNotificationToManager(Maintenance $maintenance, User $technician, User $manager): array
+    {
+        if (empty($manager->email) || !filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => "Email gestionnaire manquant ou invalide."];
+        }
+
+        $ref = $maintenance->reference_code ?? ('MNT-#' . $maintenance->id);
+        $subject = "⚡ Ordre d'intervention accepté par {$technician->name} — {$ref}";
+        $html = $this->buildManagerAcceptedHtml(
+            managerName: $manager->name,
+            technicianName: $technician->name,
+            referenceCode: $ref,
+            infraName: $maintenance->infrastructure?->name ?? 'Infrastructure',
+            scheduledAt: $maintenance->scheduled_at ? $maintenance->scheduled_at->format('d/m/Y à H:i') : 'Date convenue'
+        );
+
+        return $this->sendTransactionalEmail($manager->email, $manager->name, $subject, $html);
+    }
+
+    /**
+     * Send email notification to manager when technician requests a prolongation.
+     */
+    public function sendProlongationNotificationToManager(Maintenance $maintenance, User $technician, User $manager, int $days, string $reason): array
+    {
+        if (empty($manager->email) || !filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => "Email gestionnaire manquant ou invalide."];
+        }
+
+        $ref = $maintenance->reference_code ?? ('MNT-#' . $maintenance->id);
+        $subject = "⏳ Demande de prolongation (+{$days}j) — {$ref}";
+        $html = $this->buildManagerProlongationHtml(
+            managerName: $manager->name,
+            technicianName: $technician->name,
+            referenceCode: $ref,
+            infraName: $maintenance->infrastructure?->name ?? 'Infrastructure',
+            days: $days,
+            reason: $reason,
+            newDate: $maintenance->scheduled_at ? $maintenance->scheduled_at->format('d/m/Y') : 'Non fixée'
+        );
+
+        return $this->sendTransactionalEmail($manager->email, $manager->name, $subject, $html);
+    }
+
+    /**
+     * Send email notification to manager when technician completes an intervention.
+     */
+    public function sendTechnicianCompletedNotificationToManager(Maintenance $maintenance, User $technician, User $manager, int $healthScore = 100): array
+    {
+        if (empty($manager->email) || !filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => "Email gestionnaire manquant ou invalide."];
+        }
+
+        $ref = $maintenance->reference_code ?? ('MNT-#' . $maintenance->id);
+        $subject = "✓ Intervention achevée avec succès (Santé: {$healthScore}%) — {$ref}";
+        $html = $this->buildManagerCompletedHtml(
+            managerName: $manager->name,
+            technicianName: $technician->name,
+            referenceCode: $ref,
+            infraName: $maintenance->infrastructure?->name ?? 'Infrastructure',
+            healthScore: $healthScore,
+            resultText: $maintenance->result ?? 'Travaux finalisés'
+        );
+
+        return $this->sendTransactionalEmail($manager->email, $manager->name, $subject, $html);
+    }
+
+    protected function buildManagerAcceptedHtml(string $managerName, string $technicianName, string $referenceCode, string $infraName, string $scheduledAt): string
+    {
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Intervention acceptée</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f8f7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #172c32;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 15px;">
+        <tr>
+            <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(7, 63, 74, 0.08);">
+                    <tr>
+                        <td style="background-color: #073f4a; padding: 28px 36px;">
+                            <div style="font-size: 22px; font-weight: 800; color: #ffffff;">Aqua<span style="color: #16b7a3;">Secure</span></div>
+                            <div style="font-size: 13px; color: #16b7a3; font-weight: 700; margin-top: 4px;">Notification de Prise en Charge</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 36px;">
+                            <h2 style="font-size: 18px; color: #073f4a; margin-top: 0;">Le technicien a confirmé la mission</h2>
+                            <p style="color: #526a6d; font-size: 14px;">Bonjour {$managerName},</p>
+                            <p style="color: #526a6d; font-size: 14px;">
+                                Le technicien <strong>{$technicianName}</strong> a accepté l'ordre d'intervention pour <strong>{$referenceCode}</strong> sur l'infrastructure <strong>{$infraName}</strong>.
+                            </p>
+                            <div style="background-color: #edfbf7; border-left: 4px solid #13886f; border-radius: 4px; padding: 14px; margin: 18px 0; font-size: 14px; color: #0f6250;">
+                                <strong>Statut :</strong> En cours d'exécution (Étape 2/3)<br>
+                                <strong>Date programmée :</strong> {$scheduledAt}
+                            </div>
+                            <p style="color: #526a6d; font-size: 13px;">
+                                L'affectation est désormais verrouillée et consultable en temps réel dans votre tableau de bord.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+HTML;
+    }
+
+    protected function buildManagerProlongationHtml(string $managerName, string $technicianName, string $referenceCode, string $infraName, int $days, string $reason, string $newDate): string
+    {
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Prolongation d'intervention</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f8f7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #172c32;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 15px;">
+        <tr>
+            <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(7, 63, 74, 0.08);">
+                    <tr>
+                        <td style="background-color: #073f4a; padding: 28px 36px;">
+                            <div style="font-size: 22px; font-weight: 800; color: #ffffff;">Aqua<span style="color: #16b7a3;">Secure</span></div>
+                            <div style="font-size: 13px; color: #f59e0b; font-weight: 700; margin-top: 4px;">Ajustement de Calendrier Technique</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 36px;">
+                            <h2 style="font-size: 18px; color: #b45309; margin-top: 0;">Report d'échéance : +{$days} jour(s)</h2>
+                            <p style="color: #526a6d; font-size: 14px;">Bonjour {$managerName},</p>
+                            <p style="color: #526a6d; font-size: 14px;">
+                                Le technicien <strong>{$technicianName}</strong> a prolongé l'intervention <strong>{$referenceCode}</strong> sur <strong>{$infraName}</strong> de <strong>{$days} jour(s)</strong>.
+                            </p>
+                            <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px; padding: 14px; margin: 18px 0; font-size: 14px; color: #92400e;">
+                                <strong>Nouvelle échéance prévue :</strong> {$newDate}<br>
+                                <strong>Motif indiqué :</strong> {$reason}
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+HTML;
+    }
+
+    protected function buildManagerCompletedHtml(string $managerName, string $technicianName, string $referenceCode, string $infraName, int $healthScore, string $resultText): string
+    {
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Intervention terminée</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f8f7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #172c32;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 15px;">
+        <tr>
+            <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(7, 63, 74, 0.08);">
+                    <tr>
+                        <td style="background-color: #073f4a; padding: 28px 36px;">
+                            <div style="font-size: 22px; font-weight: 800; color: #ffffff;">Aqua<span style="color: #16b7a3;">Secure</span></div>
+                            <div style="font-size: 13px; color: #10b981; font-weight: 700; margin-top: 4px;">Intervention Finalisée & Santé 100%</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 36px;">
+                            <h2 style="font-size: 18px; color: #047857; margin-top: 0;">Travaux achevés avec succès</h2>
+                            <p style="color: #526a6d; font-size: 14px;">Bonjour {$managerName},</p>
+                            <p style="color: #526a6d; font-size: 14px;">
+                                Le technicien <strong>{$technicianName}</strong> a finalisé l'intervention <strong>{$referenceCode}</strong> sur l'infrastructure <strong>{$infraName}</strong>.
+                            </p>
+                            <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; border-radius: 4px; padding: 14px; margin: 18px 0; font-size: 14px; color: #065f46;">
+                                <strong>Santé de l'infrastructure :</strong> {$healthScore}% (Opérationnel / Excellent)<br>
+                                <strong>Compte-rendu :</strong> {$resultText}
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+HTML;
+    }
 }
+

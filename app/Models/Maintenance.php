@@ -35,6 +35,10 @@ class Maintenance extends Model
         'cost',
         'duration_hours',
         'scheduled_at',
+        'prolonged_at',
+        'prolongation_days',
+        'prolongation_reason',
+        'prolongation_history',
         'started_at',
         'completed_at',
         'performed_at',
@@ -45,6 +49,9 @@ class Maintenance extends Model
     {
         return [
             'scheduled_at' => 'datetime',
+            'prolonged_at' => 'datetime',
+            'prolongation_days' => 'integer',
+            'prolongation_history' => 'array',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
             'performed_at' => 'datetime',

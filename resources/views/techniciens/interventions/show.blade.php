@@ -47,6 +47,58 @@
     </div>
 @endif
 
+{{-- Lifecycle Progress Stepper (1 Planifiée -> 2 En cours -> 3 Terminée) --}}
+<div class="stepper-wrap" style="display: flex; align-items: center; gap: 12px; background: #fbfdfc; border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; overflow-x: auto;">
+    <div class="stepper-step completed">
+        <div class="stepper-step-num">1</div>
+        <span>Planifiée</span>
+    </div>
+    <div class="stepper-line {{ in_array($maintenance->status, ['in_progress', 'awaiting_validation', 'completed']) ? 'completed' : '' }}"></div>
+
+    <div class="stepper-step {{ $maintenance->status === 'completed' ? 'completed' : (in_array($maintenance->status, ['in_progress', 'awaiting_validation']) ? 'active' : '') }}">
+        <div class="stepper-step-num">2</div>
+        <span>En cours d'exécution</span>
+    </div>
+    <div class="stepper-line {{ $maintenance->status === 'completed' ? 'completed' : '' }}"></div>
+
+    <div class="stepper-step {{ $maintenance->status === 'completed' ? 'completed' : '' }}">
+        <div class="stepper-step-num">3</div>
+        <span>Terminée & Validée</span>
+    </div>
+
+    @if($maintenance->status === 'completed')
+        <div style="margin-left: auto;">
+            <span class="badge badge-success" style="font-size: 12px; padding: 6px 14px; border-radius: 20px;">
+                ✓ Mission Accomplie (Santé Ouvrage: 100%)
+            </span>
+        </div>
+    @elseif($maintenance->prolonged_at)
+        <div style="margin-left: auto;">
+            <span class="badge badge-warning" style="font-size: 12px; padding: 6px 14px; border-radius: 20px;">
+                ⏳ Échéance reportée (+{{ $maintenance->prolongation_days }}j)
+            </span>
+        </div>
+    @endif
+</div>
+
+{{-- Prolongation notification banner if active --}}
+@if($maintenance->prolonged_at)
+    <div style="background: #fffbeb; border: 1px solid #fde68a; border-left: 5px solid #f59e0b; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.08);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <strong style="color: #b45309; font-size: 14px; display: block;">⏳ Intervention prolongée de {{ $maintenance->prolongation_days }} jour(s) :</strong>
+                <span style="color: #92400e; font-size: 13px;">
+                    Nouvelle date fixée au <strong>{{ $maintenance->scheduled_at ? $maintenance->scheduled_at->format('d/m/Y') : '' }}</strong>.
+                    @if($maintenance->prolongation_reason)
+                        — Motif : « <em>{{ $maintenance->prolongation_reason }}</em> »
+                    @endif
+                </span>
+            </div>
+            <span style="font-size: 12px; color: #b45309; font-weight: 700;">Gestionnaire informé</span>
+        </div>
+    </div>
+@endif
+
 {{-- Correction Notes from Manager --}}
 @if($maintenance->manager_correction_notes && $maintenance->status === 'in_progress')
     <div style="background: #fff7ed; border: 1px solid #fed7aa; border-left: 5px solid #ea580c; border-radius: 8px; padding: 20px 24px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.08);">
@@ -145,6 +197,53 @@
                 </div>
             </div>
         </div>
+
+        @if(in_array($maintenance->status, ['in_progress', 'planned']))
+            {{-- Prolongation Request Card --}}
+            <div class="panel" style="border: 1.5px solid #fed7aa; background: #fffcf9; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.06);">
+                <h3 style="font-size: 15px; margin-top: 0; margin-bottom: 8px; color: #9a3412; display: flex; align-items: center; gap: 8px;">
+                    <span>⏳</span> Décaler / Prolonger l'échéance
+                </h3>
+                <p style="font-size: 13px; color: #7c2d12; margin: 0 0 14px; line-height: 1.5;">
+                    En cas de contrainte imprévue (pièces de rechange, météo, etc.), prolongez la date. Le gestionnaire sera immédiatement notifié.
+                </p>
+
+                <form method="POST" action="{{ route('technicien.interventions.prolong', $maintenance) }}">
+                    @csrf
+                    <div style="margin-bottom: 12px;">
+                        <label for="prolong_days" style="display: block; font-size: 12px; font-weight: 700; color: #526a6d; margin-bottom: 4px;">Durée de report :</label>
+                        <select name="days" id="prolong_days" style="width: 100%; border: 1px solid #fed7aa; border-radius: 6px; padding: 9px; font-size: 13px; background: #ffffff;">
+                            <option value="1">+1 jour ouvrable</option>
+                            <option value="2">+2 jours</option>
+                            <option value="3" selected>+3 jours</option>
+                            <option value="5">+5 jours</option>
+                            <option value="7">+7 jours (1 semaine)</option>
+                            <option value="14">+14 jours (2 semaines)</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 14px;">
+                        <label for="prolong_reason" style="display: block; font-size: 12px; font-weight: 700; color: #526a6d; margin-bottom: 4px;">Motif explicatif :</label>
+                        <textarea name="reason" id="prolong_reason" rows="2" required placeholder="Ex: Délai fournisseur pour vanne papillon, météo défavorable..." style="width: 100%; border: 1px solid #fed7aa; border-radius: 6px; padding: 8px; font-size: 13px; font-family: inherit;"></textarea>
+                    </div>
+
+                    <button type="submit" class="button" style="background: #ea580c; color: #fff; font-size: 13px; font-weight: 700; padding: 10px 18px; border-radius: 6px; width: 100%; justify-content: center; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.2);">
+                        ⏳ Confirmer la prolongation
+                    </button>
+                </form>
+
+                @if(!empty($maintenance->prolongation_history) && is_array($maintenance->prolongation_history))
+                    <div style="border-top: 1px dashed #fed7aa; margin-top: 14px; padding-top: 10px;">
+                        <span style="font-size: 11px; font-weight: 700; color: #9a3412; text-transform: uppercase;">Historique des reports :</span>
+                        <ul style="margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: #7c2d12;">
+                            @foreach($maintenance->prolongation_history as $h)
+                                <li>+{{ $h['days'] ?? 0 }}j ({{ $h['reason'] ?? '' }})</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </div>
+        @endif
     </div>
 
     {{-- Right: Execution Controls & Technical Report --}}
