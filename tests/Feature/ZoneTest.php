@@ -7,6 +7,8 @@ use App\Models\Incident;
 use App\Models\User;
 use App\Models\Zone;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ZoneTest extends TestCase
@@ -207,5 +209,102 @@ class ZoneTest extends TestCase
         ]);
 
         $this->assertSame(1, Alert::count());
+    }
+
+    /**
+     * Faux fichier image valide sans dépendre de l'extension GD.
+     * (GD n'est pas forcément installé sur l'environnement de test.)
+     */
+    private function fakeImage(string $name = 'zone.png'): UploadedFile
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8AAAwAB/4X1xQAAAABJRU5ErkJggg==');
+
+        return UploadedFile::fake()->createWithContent($name, $png);
+    }
+
+    public function test_store_with_photo_saves_the_file(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->post(route('back.zones.store'), [
+            'name' => 'Zone Photogénique',
+            'address' => '1 quai des Photos, Lyon',
+            'risk_level' => 'low',
+            'image' => $this->fakeImage('zone.png'),
+        ]);
+
+        $response->assertRedirect(route('back.zones.index'));
+
+        $zone = Zone::where('name', 'Zone Photogénique')->firstOrFail();
+        $this->assertNotNull($zone->image_path);
+        Storage::disk('public')->assertExists($zone->image_path);
+    }
+
+    public function test_store_rejects_an_invalid_photo(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->from(route('back.zones.create'))->post(route('back.zones.store'), [
+            'name' => 'Zone Fichier',
+            'address' => '2 rue des Tests, Lille',
+            'risk_level' => 'low',
+            'image' => UploadedFile::fake()->create('document.pdf', 100, 'application/pdf'),
+        ]);
+
+        $response->assertSessionHasErrors('image');
+        $this->assertDatabaseCount('zones', 0);
+    }
+
+    public function test_update_replaces_and_removes_the_photo(): void
+    {
+        Storage::fake('public');
+
+        $oldPath = $this->fakeImage('old.png')->store('zones', 'public');
+        $zone = Zone::factory()->create(['image_path' => $oldPath]);
+
+        $this->put(route('back.zones.update', $zone), [
+            'name' => $zone->name,
+            'address' => $zone->address,
+            'risk_level' => $zone->risk_level,
+            'image' => $this->fakeImage('new.png'),
+        ])->assertRedirect(route('back.zones.show', $zone));
+
+        $zone->refresh();
+        $this->assertNotSame($oldPath, $zone->image_path);
+        Storage::disk('public')->assertMissing($oldPath);
+        Storage::disk('public')->assertExists($zone->image_path);
+
+        $this->put(route('back.zones.update', $zone), [
+            'name' => $zone->name,
+            'address' => $zone->address,
+            'risk_level' => $zone->risk_level,
+            'remove_image' => '1',
+        ])->assertRedirect(route('back.zones.show', $zone));
+
+        $zone->refresh();
+        $this->assertNull($zone->image_path);
+    }
+
+    public function test_front_zones_page_displays_the_zone_photo(): void
+    {
+        $zone = Zone::factory()->create([
+            'name' => 'Zone Photo Front',
+            'image_path' => 'zones/photo-front.jpg',
+        ]);
+
+        $this->get('/zones')
+            ->assertOk()
+            ->assertSee('Zone Photo Front')
+            ->assertSee('storage/'.$zone->image_path);
+    }
+
+    public function test_front_alerts_page_displays_the_linked_zone_photo(): void
+    {
+        $zone = Zone::factory()->create(['image_path' => 'zones/alertes.jpg']);
+        Alert::factory()->create(['zone_id' => $zone->id]);
+
+        $this->get('/alerts')
+            ->assertOk()
+            ->assertSee('storage/'.$zone->image_path);
     }
 }
