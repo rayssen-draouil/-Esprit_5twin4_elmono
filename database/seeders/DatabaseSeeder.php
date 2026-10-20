@@ -21,6 +21,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(ZoneSeeder::class);
+        $this->call(RealProjectsSeeder::class);
+        $this->call(TechnicianSeeder::class);
 
         // 1. Users
         $admin = User::updateOrCreate(
@@ -29,6 +31,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Claire Martin',
                 'password' => Hash::make('password123'),
                 'role' => 'admin',
+                'email_verified_at' => now(),
             ]
         );
 
@@ -38,6 +41,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Thomas Bernard',
                 'password' => Hash::make('password123'),
                 'role' => 'manager',
+                'email_verified_at' => now(),
             ]
         );
 
@@ -47,6 +51,9 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Sarah Petit',
                 'password' => Hash::make('password123'),
                 'role' => 'technician',
+                'email_verified_at' => now(),
+                'speciality' => 'Génie Civil & Auscultation Barrages (DGBGTH)',
+                'status' => 'available',
             ]
         );
 
@@ -56,6 +63,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Jean Dupont',
                 'password' => Hash::make('password123'),
                 'role' => 'citizen',
+                'email_verified_at' => now(),
             ]
         );
 

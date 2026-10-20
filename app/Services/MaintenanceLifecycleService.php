@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
-use App\Models\Technicien;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +31,7 @@ class MaintenanceLifecycleService
      *     recommendations?: ?string
      * } $reportData
      */
-    public function submitCompletion(Maintenance $maintenance, Technicien $technician, array $reportData): Maintenance
+    public function submitCompletion(Maintenance $maintenance, User $technician, array $reportData): Maintenance
     {
         return DB::transaction(function () use ($maintenance, $technician, $reportData) {
             $locked = Maintenance::lockForUpdate()->findOrFail($maintenance->id);

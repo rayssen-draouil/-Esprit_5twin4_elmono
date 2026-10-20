@@ -4,8 +4,9 @@
         <input name="name" value="{{ old('name', $technician->name ?? '') }}" required>
         @error('name')<small class="field-error">{{ $message }}</small>@enderror
     </label>
-    <label>Email
-        <input type="email" name="email" value="{{ old('email', $technician->email ?? '') }}">
+    <label>Email <span style="color: var(--coral);">*</span>
+        <input type="email" name="email" value="{{ old('email', $technician->email ?? '') }}" required>
+        <span class="form-hint">Identifiant de connexion du technicien.</span>
         @error('email')<small class="field-error">{{ $message }}</small>@enderror
     </label>
     <label>Téléphone
@@ -23,6 +24,17 @@
             @endforeach
         </select>
         @error('status')<small class="field-error">{{ $message }}</small>@enderror
+    </label>
+    <label>Mot de passe
+        <input type="password" name="password" value="" autocomplete="new-password">
+        <span class="form-hint">
+            @if(isset($technician) && $technician->exists)
+                Laissez vide pour conserver le mot de passe actuel.
+            @else
+                Mot de passe par défaut : {{ \App\Models\User::DEFAULT_PASSWORD }}
+            @endif
+        </span>
+        @error('password')<small class="field-error">{{ $message }}</small>@enderror
     </label>
 </div>
 <div class="form-actions"><a class="button button-ghost" href="{{ route('techniciens.index') }}">Annuler</a><button class="button" type="submit">{{ $submitLabel }}</button></div>

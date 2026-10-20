@@ -26,7 +26,7 @@ class UpdateMaintenanceRequest extends FormRequest
                 'regex:/^[A-Z0-9\-_]+$/i',
                 Rule::unique('maintenances', 'reference_code')->ignore($maintenanceId),
             ],
-            'technician_id' => ['nullable', 'integer', 'exists:techniciens,id'],
+            'technician_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('role', 'technician')],
             'team' => ['nullable', 'string', 'max:255', 'regex:/^[\p{L}\s\-\'.]+$/u'],
             'type' => ['required', 'string', 'max:100'],
             'priority' => ['required', 'in:low,medium,high,critical'],

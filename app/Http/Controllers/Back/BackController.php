@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Back;
 
 use App\Http\Controllers\Controller;
+use App\Models\DecisionHistory;
 use App\Models\Financement;
 use App\Models\Incident;
 use App\Models\Infrastructure;
@@ -28,31 +29,104 @@ class BackController extends Controller
         $projectCount = Project::count();
         $inProgressProjects = Project::where('status', 'in_progress')->count();
         $completedProjects = Project::where('status', 'completed')->count();
+        $pendingProjects = Project::where('validation_status', 'pending_approval')->count();
+        $pendingFinancements = Financement::where('validation_status', 'pending_approval')->count();
+        $approvedProjects = Project::where('validation_status', 'approved')->count();
+        $rejectedProjects = Project::where('validation_status', 'rejected')->count();
+        $approvedFinancements = Financement::where('validation_status', 'approved')->count();
+        $rejectedFinancements = Financement::where('validation_status', 'rejected')->count();
+
+        // Financements confirmés (statut received + validation_status approved)
+        $confirmedFundingTotal = (float) Financement::where('status', 'received')
+            ->where('validation_status', 'approved')
+            ->sum('amount');
+
+        // Budget révisé (dernière révision approuvée ou budget initial)
+        $revisedBudgetTotal = 0.0;
+        $projects = Project::with(['budgetRevisions' => function ($q) {
+            $q->where('status', 'approved')->orderByDesc('approved_at')->orderByDesc('id');
+        }])->get();
+        foreach ($projects as $project) {
+            $latestRevision = $project->budgetRevisions->first();
+            $revisedBudgetTotal += (float) ($latestRevision->proposed_amount ?? $project->budget);
+        }
+
+        // Projets sous-financés (budget révisé > financement confirmé)
+        $underfundedCount = 0;
+        foreach ($projects as $project) {
+            $confirmed = (float) $project->financements()
+                ->where('status', 'received')
+                ->where('validation_status', 'approved')
+                ->sum('amount');
+            $budget = (float) ($project->budgetRevisions->first()->proposed_amount ?? $project->budget);
+            if ($budget > 0 && $confirmed < $budget) {
+                $underfundedCount++;
+            }
+        }
+
+        $remainingToFund = max(0, $revisedBudgetTotal - $confirmedFundingTotal);
 
         $kpis = [
             ['label' => 'Sites surveillés', 'value' => (string) $infraCount, 'trend' => 'Données réelles'],
             ['label' => 'Incidents actifs', 'value' => sprintf('%02d', $activeIncidents), 'trend' => 'Données réelles'],
             ['label' => 'Infrastructures critiques', 'value' => sprintf('%02d', $criticalInfras), 'trend' => 'Données réelles'],
             ['label' => 'Projets actifs', 'value' => (string) $inProgressProjects, 'trend' => 'Données réelles'],
-            ['label' => 'Budget total', 'value' => number_format($budgetTotal, 0, ',', ' ') . ' €', 'trend' => number_format($fundingTotal, 0, ',', ' ') . ' € financés'],
+            ['label' => 'Budget total', 'value' => number_format($revisedBudgetTotal, 0, ',', ' ') . ' €', 'trend' => number_format($confirmedFundingTotal, 0, ',', ' ') . ' € financés'],
+            ['label' => 'Validations en attente', 'value' => (string) ($pendingProjects + $pendingFinancements), 'trend' => $pendingProjects . ' projets · ' . $pendingFinancements . ' financements'],
         ];
 
-        $activity = [
-            'Capteur #A-204 reconnecté',
-            'Nouvel incident signalé à Sète',
-            'Validation du projet Adour-Garonne',
-        ];
+        $activity = $this->getRecentActivity();
 
         $projectStats = [
             'total' => $projectCount,
             'in_progress' => $inProgressProjects,
             'completed' => $completedProjects,
-            'budget' => $budgetTotal,
-            'funding' => $fundingTotal,
-            'remaining' => max(0, $budgetTotal - $fundingTotal),
+            'pending_validation' => $pendingProjects,
+            'approved' => $approvedProjects,
+            'rejected' => $rejectedProjects,
+            'budget' => $revisedBudgetTotal,
+            'funding' => $confirmedFundingTotal,
+            'remaining' => $remainingToFund,
+            'underfunded' => $underfundedCount,
+            'pending_funding_validation' => $pendingFinancements,
+            'approved_funding' => $approvedFinancements,
+            'rejected_funding' => $rejectedFinancements,
         ];
 
         return view('back.dashboard', compact('kpis', 'activity', 'projectStats'));
+    }
+
+    /**
+     * Récupère l'activité récente (décisions + signalements récents).
+     */
+    private function getRecentActivity(): array
+    {
+        $items = [];
+
+        $recentDecisions = DecisionHistory::with('user')
+            ->whereIn('resource_type', ['project', 'financement'])
+            ->whereNotNull('old_status')
+            ->latest()
+            ->take(5)
+            ->get();
+
+        foreach ($recentDecisions as $decision) {
+            $label = match ($decision->action_type) {
+                'approve' => 'Approuvé',
+                'reject' => 'Rejeté',
+                'submit' => 'Soumis',
+                default => $decision->action_type,
+            };
+            $resourceLabel = $decision->resource_type === 'project' ? 'projet' : 'financement';
+            $items[] = "{$label} {$resourceLabel} · " . ($decision->user->name ?? 'Système');
+        }
+
+        $recentSignalements = Signalement::latest('reported_at')->take(3)->get();
+        foreach ($recentSignalements as $signalement) {
+            $items[] = "Signalement · {$signalement->type} · {$signalement->location}";
+        }
+
+        return array_slice($items, 0, 6);
     }
 
     public function incidents(): View

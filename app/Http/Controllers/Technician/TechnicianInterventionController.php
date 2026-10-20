@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Technician;
 
 use App\Http\Controllers\Controller;
 use App\Models\Maintenance;
-use App\Models\Technicien;
+use App\Models\User;
 use App\Services\MaintenanceLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,18 +21,20 @@ class TechnicianInterventionController extends Controller
     }
 
     /**
-     * Get the authenticated technician model.
+     * Get the authenticated technician.
+     *
+     * Le technicien est un rôle applicatif : il correspond directement à
+     * l'utilisateur connecté.
      */
-    protected function getTechnician(): ?Technicien
+    protected function getTechnician(): ?User
     {
         $user = Auth::user();
-        if (!$user) {
+
+        if (!$user || !$user->isTechnician()) {
             return null;
         }
 
-        return Technicien::where('user_id', $user->id)
-            ->orWhere('email', $user->email)
-            ->first();
+        return $user;
     }
 
     /**

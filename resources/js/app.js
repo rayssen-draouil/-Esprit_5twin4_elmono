@@ -1,3 +1,4 @@
+import 'chart.js';
 import './bootstrap';
 import './infra-validation';
 

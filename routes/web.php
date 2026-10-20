@@ -5,11 +5,12 @@ use App\Http\Controllers\Back\AiIntelligenceSuiteController;
 use App\Http\Controllers\Back\AlertAiController;
 use App\Http\Controllers\Back\AlertController;
 use App\Http\Controllers\Back\BackController;
+use App\Http\Controllers\Back\FinancialDashboardController;
 use App\Http\Controllers\Back\MaintenanceIntelligenceController;
 use App\Http\Controllers\Back\ZoneAiController;
 use App\Http\Controllers\Back\ZoneController;
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\FinancementController;
 use App\Http\Controllers\Front\FrontController;
 use App\Http\Controllers\Front\PublicZoneAlertController;
@@ -17,26 +18,91 @@ use App\Http\Controllers\InfrastructureController;
 use App\Http\Controllers\InterventionController;
 use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\MaintenanceInvitationController;
-use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\TechnicienController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectDoctorController;
 use App\Http\Controllers\Technician\TechnicianInterventionController;
+use App\Http\Controllers\TechnicienController;
+use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UserController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Route Model Binding
+|--------------------------------------------------------------------------
+|
+| Le technicien n'est pas une entité séparée : c'est un utilisateur portant
+| le rôle `technician`. Les routes « technicien » résolvent ces comptes,
+| ainsi que les rares comptes qui assument une affectation d'intervenant
+| sans porter le rôle (cas des affectations historiques).
+|
+*/
+Route::bind('technicien', function ($value) {
+    return \App\Models\User::where('id', $value)
+        ->where(function ($query) {
+            $query->where('role', 'technician')
+                ->orWhereHas('maintenances')
+                ->orWhereHas('interventions');
+        })
+        ->firstOrFail();
+});
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.store');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->name('register.store');
+    Route::get('/forgot-password', [PasswordResetController::class, 'create'])->name('password.request');
+    Route::post('/forgot-password', [PasswordResetController::class, 'send'])->middleware('throttle:5,1')->name('password.email');
+    Route::get('/reset-password/{token}', [PasswordResetController::class, 'edit'])->name('password.reset');
+    Route::post('/reset-password', [PasswordResetController::class, 'update'])->name('password.update');
 });
+Route::get('/two-factor-challenge', [TwoFactorController::class, 'challenge'])->name('two-factor.login');
+Route::post('/two-factor-challenge', [TwoFactorController::class, 'verifyChallenge'])->name('two-factor.login.store');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'redirect'])->name('dashboard');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
+    Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->middleware('signed')->name('verification.verify');
+    Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:3,1')->name('verification.send');
+    Route::post('/profile/two-factor', [TwoFactorController::class, 'enable'])->name('two-factor.enable');
+    Route::post('/profile/two-factor/confirm', [TwoFactorController::class, 'confirm'])->name('two-factor.confirm');
+    Route::post('/profile/two-factor/disable', [TwoFactorController::class, 'disable'])->name('two-factor.disable');
+    Route::get('/profile/two-factor/recovery-codes', [TwoFactorController::class, 'recoveryCodes'])->name('two-factor.recovery-codes');
+    Route::post('/profile/two-factor/recovery-codes', [TwoFactorController::class, 'showRecoveryCodes'])->name('two-factor.recovery-codes.show');
+    Route::post('/profile/two-factor/recovery-codes/regenerate', [TwoFactorController::class, 'regenerateRecoveryCodes'])->name('two-factor.recovery-codes.regenerate');
     Route::get('/dashboard/manager', [DashboardController::class, 'manager'])->middleware('role:manager,gestionnaire')->name('manager.dashboard');
     Route::get('/dashboard/citizen', [DashboardController::class, 'citizen'])->middleware('role:citizen,citoyen')->name('citizen.dashboard');
+
+    // Notifications internes
+    Route::put('/notifications/{notification}/read', function ($notification) {
+        $notification = DB::table('notifications')->where('id', $notification)->where('notifiable_type', 'App\Models\User')->where('notifiable_id', auth()->id())->first();
+        if ($notification) {
+            DB::table('notifications')->where('id', $notification->id)->update(['read_at' => now()]);
+        }
+
+        return back();
+    })->name('notifications.read');
+
+    Route::put('/notifications/read-all', function () {
+        DB::table('notifications')
+            ->where('notifiable_type', 'App\Models\User')
+            ->where('notifiable_id', auth()->id())
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return back();
+    })->name('notifications.read-all');
 });
 
 Route::get('/', [FrontController::class, 'home'])->name('home');
@@ -99,6 +165,8 @@ Route::middleware(['auth', 'role:admin,manager,gestionnaire'])->prefix('back')->
     Route::get('/alerts/live', [AlertController::class, 'live'])->middleware('throttle:120,1')->name('alerts.live');
     Route::post('/alerts/bulk', [AlertController::class, 'bulk'])->name('alerts.bulk');
 
+    Route::get('/financial/dashboard', [FinancialDashboardController::class, '__invoke'])->name('financial.dashboard');
+    Route::get('/pilotage', [PilotageController::class, '__invoke'])->name('pilotage');
     Route::resource('zones', ZoneController::class);
     Route::resource('alerts', AlertController::class);
 
@@ -131,11 +199,11 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::delete('/incidents/{incident}', [BackController::class, 'destroyIncident'])->name('incidents.destroy');
 });
 
-Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->group(function () {
     Route::resource('users', UserController::class)->names('admin.users');
 });
 
-Route::middleware(['auth', 'role:admin,manager,gestionnaire'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'verified', 'role:admin,manager,gestionnaire'])->prefix('admin')->group(function () {
     Route::resource('infrastructures', InfrastructureController::class)->names('infrastructures');
     Route::resource('maintenances', MaintenanceController::class)->names('maintenances');
     Route::post('/maintenances/{maintenance}/start', [MaintenanceController::class, 'start'])->name('maintenances.start');
@@ -167,9 +235,22 @@ Route::middleware(['auth', 'role:admin,manager,gestionnaire'])->prefix('admin')-
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
         ->names('projects');
 
+    Route::post('/projects/{project}/submit', [ProjectController::class, 'submit'])->name('projects.submit');
+    Route::post('/projects/{project}/decide', [ProjectController::class, 'decide'])->name('projects.decide');
+
+    // Project Doctor — chatbot IA d'analyse de projets
+    Route::post('/projects/doctor/message', [ProjectDoctorController::class, 'message'])
+        ->middleware('throttle:30,1')
+        ->name('projects.doctor.message');
+    Route::get('/projects/doctor/status', [ProjectDoctorController::class, 'status'])
+        ->name('projects.doctor.status');
+
     Route::resource('financements', FinancementController::class)
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
         ->names('financements');
+
+    Route::post('/financements/{financement}/submit', [FinancementController::class, 'submit'])->name('financements.submit');
+    Route::post('/financements/{financement}/decide', [FinancementController::class, 'decide'])->name('financements.decide');
 
     Route::resource('interventions', InterventionController::class)
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
@@ -186,4 +267,3 @@ Route::middleware(['auth', 'role:technician,admin'])->prefix('technicien')->name
     Route::get('/interventions/{maintenance}', [TechnicianInterventionController::class, 'show'])->name('interventions.show');
     Route::post('/interventions/{maintenance}/complete', [TechnicianInterventionController::class, 'submitCompletion'])->name('interventions.complete');
 });
-

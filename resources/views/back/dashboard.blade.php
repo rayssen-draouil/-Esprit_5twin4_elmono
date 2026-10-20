@@ -3,7 +3,10 @@
 @section('content')
 <div class="content-heading">
     <div><span class="eyebrow">DIMANCHE 04 OCTOBRE 2026 · 09:42</span><h1>Bonjour Claire <span>✦</span></h1><p>Voici l'état de votre réseau aujourd'hui.</p></div>
-    <x-ui.button>Exporter le rapport ↓</x-ui.button>
+    <div class="actions">
+        <a class="button button-ghost" href="{{ route('back.pilotage') }}">📊 Centre de pilotage</a>
+        <x-ui.button>Exporter le rapport ↓</x-ui.button>
+    </div>
 </div>
 
 <div class="kpi-grid">
@@ -15,8 +18,9 @@
     <div class="kpi"><span>Total projets</span><strong>{{ $projectStats['total'] }}</strong></div>
     <div class="kpi"><span>Projets en cours</span><strong>{{ $projectStats['in_progress'] }}</strong></div>
     <div class="kpi"><span>Projets terminés</span><strong>{{ $projectStats['completed'] }}</strong></div>
+    <div class="kpi"><span>En attente validation</span><strong>{{ $projectStats['pending_validation'] }}</strong></div>
     <div class="kpi"><span>Total financements</span><strong>{{ number_format($projectStats['funding'], 0, ',', ' ') }} €</strong></div>
-    <div class="kpi"><span>Reste à financer</span><strong>{{ number_format($projectStats['remaining'], 0, ',', ' ') }} €</strong></div>
+    <div class="kpi"><span>Financements en attente</span><strong>{{ $projectStats['pending_funding_validation'] }}</strong></div>
 </div>
 
 <div class="dashboard-grid">
@@ -41,4 +45,36 @@
         <div class="budget-total"><strong>2,48 M€</strong><span>sur 3,10 M€ engagés</span></div><div class="progress"><i style="width:80%"></i></div><div class="budget-meta"><span>80% consommé</span><span>620 k€ disponibles</span></div>
     </section>
 </div>
+
+@if($projectStats['pending_validation'] > 0 || $projectStats['pending_funding_validation'] > 0)
+<div class="dashboard-grid dashboard-grid-bottom">
+    @if($projectStats['pending_validation'] > 0)
+    <section class="panel alert-panel">
+        <div class="panel-heading"><div><span class="eyebrow">PROJETS EN ATTENTE</span><h2>Validations de projets</h2><p>{{ $projectStats['pending_validation'] }} projet(s) en attente de décision.</p></div><a href="{{ route('projects.index') }}">Voir tous ↗</a></div>
+        <div class="alert-list">
+            @php
+                $pendingProjects = \App\Models\Project::where('validation_status', 'pending_approval')->with('user')->latest()->take(5)->get();
+            @endphp
+            @foreach($pendingProjects as $p)
+            <div class="alert-row"><span class="incident-mark warning">↗</span><div><strong>{{ $p->name }}</strong><small>Soumis par {{ $p->user->name }}</small></div><a class="button button-sm button-ghost" href="{{ route('projects.show', $p) }}">Consulter</a></div>
+            @endforeach
+        </div>
+    </section>
+    @endif
+
+    @if($projectStats['pending_funding_validation'] > 0)
+    <section class="panel alert-panel">
+        <div class="panel-heading"><div><span class="eyebrow">FINANCEMENTS EN ATTENTE</span><h2>Validations de financements</h2><p>{{ $projectStats['pending_funding_validation'] }} demande(s) en attente de décision.</p></div><a href="{{ route('financements.index') }}">Voir tous ↗</a></div>
+        <div class="alert-list">
+            @php
+                $pendingFinancements = \App\Models\Financement::where('validation_status', 'pending_approval')->with(['project', 'user'])->latest()->take(5)->get();
+            @endphp
+            @foreach($pendingFinancements as $f)
+            <div class="alert-row"><span class="incident-mark warning">↗</span><div><strong>{{ $f->source }}</strong><small>{{ $f->project->name }} · {{ number_format($f->amount, 0, ',', ' ') }} €</small></div><a class="button button-sm button-ghost" href="{{ route('financements.show', $f) }}">Consulter</a></div>
+            @endforeach
+        </div>
+    </section>
+    @endif
+</div>
+@endif
 @endsection
