@@ -4,9 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Incident;
 use App\Models\Intervention;
-use App\Models\Technicien;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class InterventionController extends Controller
@@ -22,7 +23,7 @@ class InterventionController extends Controller
 
         return view('interventions.index', [
             'interventions' => $interventions,
-            'technicians' => Technicien::orderBy('name')->get(['id', 'name']),
+            'technicians' => User::technicians()->orderBy('name')->get(['id', 'name']),
             'statuses' => ['planned', 'in_progress', 'completed', 'cancelled'],
         ]);
     }
@@ -70,7 +71,7 @@ class InterventionController extends Controller
     {
         return [
             'incident_id' => ['required', 'integer', 'exists:incidents,id'],
-            'technician_id' => ['nullable', 'integer', 'exists:techniciens,id'],
+            'technician_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('role', 'technician')],
             'team' => ['required', 'string', 'max:255'],
             'scheduled_at' => ['required', 'date'],
             'status' => ['required', 'in:planned,in_progress,completed,cancelled'],
@@ -84,7 +85,7 @@ class InterventionController extends Controller
     {
         return [
             'incidents' => Incident::with('zone')->latest('reported_at')->get(),
-            'technicians' => Technicien::orderBy('name')->get(),
+            'technicians' => User::technicians()->orderBy('name')->get(),
         ];
     }
 }

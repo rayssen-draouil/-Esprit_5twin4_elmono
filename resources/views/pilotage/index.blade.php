@@ -50,7 +50,7 @@
                         <strong>{{ $item['type'] === 'projet' ? 'Projet' : 'Financement' }} : {{ $item['title'] }}</strong>
                         <small>{{ date('d/m Y H:i', strtotime($item['submitted_at'])) }} · <a href="{{ $item['url'] }}">Voir détails ↗</a></small>
                     </div>
-                    @if ($item['submitted_at'] < now()->subDays(7))
+                        @if ($item['submitted_at'] && strtotime($item['submitted_at']) < now()->subDays(7)->getTimestamp())
                         <b class="soft">Ancien &gt;7j</b>
                     @endif
                 </div>

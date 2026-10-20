@@ -32,7 +32,7 @@ class ProjectDoctorTest extends TestCase
 
     private function makeGestionnaire(): User
     {
-        return User::factory()->create(['role' => 'gestionnaire']);
+        return User::factory()->create(['role' => 'manager']);
     }
 
     private function makeCitizen(): User
@@ -548,5 +548,107 @@ class ProjectDoctorTest extends TestCase
         ]);
 
         $response->assertStatus(200);
+    }
+
+    /* ============================================================
+       CHARGE UTILE IA : CHAMPS NARRATIFS SANITISÉS
+       ============================================================ */
+
+    public function test_ai_numeric_values_never_override_deterministic_figures(): void
+    {
+        $admin = $this->makeAdmin();
+        $project = $this->makeProject(['budget' => 100000, 'progress' => 60]);
+
+        ProjectExpense::create([
+            'project_id' => $project->id, 'description' => 'Matériaux', 'category' => 'Matériaux',
+            'amount' => 60000, 'status' => 'approved', 'expense_date' => now()->format('Y-m-d'),
+        ]);
+
+        // L'IA propose des chiffres : ils ne doivent jamais remplacer les calculs serveur.
+        $this->fakeGemini([
+            'synthese' => 'Analyse simulée.',
+            'budget_initial' => 999999,
+            'cout_final_estime' => 888888,
+            'progression' => 5,
+            'ecart_estime' => 777777,
+        ]);
+
+        $response = $this->postDoctor($admin, [
+            'intent' => 'cost_estimation',
+            'message' => 'Estimer le coût final.',
+            'project_id' => $project->id,
+        ]);
+
+        $response->assertStatus(200);
+
+        $data = $response->json('data');
+
+        $this->assertSame(100000.0, (float) $data['budget_initial']);
+        $this->assertSame(100000.0, (float) $data['cout_final_estime']);
+        $this->assertSame(60, (int) $data['progression']);
+        $this->assertSame(0.0, (float) $data['ecart_estime']);
+    }
+
+    public function test_ai_payload_is_limited_to_sanitized_narrative_fields(): void
+    {
+        $admin = $this->makeAdmin();
+        $project = $this->makeProject();
+
+        $this->fakeGemini([
+            'synthese' => '<script>alert(1)</script>Synthèse <b>sûre</b>',
+            'hypotheses' => ['<i>Hypothèse</i> 1', '<script>alert(2)</script>'],
+            'recommandations' => ['Suivre les dépenses'],
+            'cout_final_estime' => 123456,
+            'mot_de_passe' => 'secret',
+        ]);
+
+        $response = $this->postDoctor($admin, [
+            'intent' => 'cost_estimation',
+            'message' => 'Estimer le coût final.',
+            'project_id' => $project->id,
+        ]);
+
+        $response->assertStatus(200);
+
+        $ia = $response->json('data.ia');
+
+        $this->assertSame('Synthèse sûre', $ia['synthese']);
+        $this->assertSame(['Hypothèse 1'], $ia['hypotheses']);
+        $this->assertSame(['Suivre les dépenses'], $ia['recommandations']);
+        $this->assertArrayNotHasKey('cout_final_estime', $ia);
+        $this->assertArrayNotHasKey('mot_de_passe', $ia);
+
+        $this->assertStringNotContainsString('<script>', (string) $response->json('answer'));
+        $this->assertStringNotContainsString('secret', (string) $response->json('data.ia.synthese'));
+    }
+
+    public function test_deterministic_fallback_exposes_missing_information_notes(): void
+    {
+        Config::set('services.gemini.key', null);
+
+        $admin = $this->makeAdmin();
+        $project = $this->makeProject(['budget' => 100000, 'progress' => 60]);
+
+        $response = $this->postDoctor($admin, [
+            'intent' => 'cost_estimation',
+            'message' => 'Estimer le coût final.',
+            'project_id' => $project->id,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.est_pi_ia', false);
+        $this->assertNotEmpty($response->json('data.ia.informations_manquantes'));
+    }
+
+    public function test_project_doctor_panel_is_rendered_on_projects_pages(): void
+    {
+        $admin = $this->makeAdmin();
+        $this->makeProject();
+
+        $response = $this->actingAs($admin)->get(route('projects.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('id="project-doctor"', false);
+        $response->assertSee(route('projects.doctor.message'), false);
     }
 }

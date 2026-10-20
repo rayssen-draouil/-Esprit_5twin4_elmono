@@ -6,7 +6,6 @@ use App\Models\Incident;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\MaintenanceIntelligenceScan;
-use App\Models\Technicien;
 use App\Models\User;
 use App\Models\Zone;
 use Database\Seeders\InfrastructureMaintenanceSeeder;
@@ -263,7 +262,7 @@ class MaintenanceIntelligenceTest extends TestCase
     {
         $manager = $this->getManagerUser();
         $infra = Infrastructure::first();
-        $tech = Technicien::first();
+        $tech = User::technicians()->first();
 
         $scheduledDate = now()->addDays(2)->setTime(10, 0)->format('Y-m-d H:i');
         $nextDate = now()->addMonths(6)->format('Y-m-d');

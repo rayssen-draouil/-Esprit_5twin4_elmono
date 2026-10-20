@@ -27,6 +27,27 @@ use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
+/*
+|--------------------------------------------------------------------------
+| Route Model Binding
+|--------------------------------------------------------------------------
+|
+| Le technicien n'est pas une entité séparée : c'est un utilisateur portant
+| le rôle `technician`. Les routes « technicien » résolvent ces comptes,
+| ainsi que les rares comptes qui assument une affectation d'intervenant
+| sans porter le rôle (cas des affectations historiques).
+|
+*/
+Route::bind('technicien', function ($value) {
+    return \App\Models\User::where('id', $value)
+        ->where(function ($query) {
+            $query->where('role', 'technician')
+                ->orWhereHas('maintenances')
+                ->orWhereHas('interventions');
+        })
+        ->firstOrFail();
+});
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.store');

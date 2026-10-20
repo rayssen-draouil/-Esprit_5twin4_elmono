@@ -13,10 +13,10 @@ class RealProjectsSeeder extends Seeder
     public function run(): void
     {
         $admin = User::where('role', 'admin')->first()
-            ?? User::factory()->create(['role' => 'admin', 'name' => 'Admin AquaSecure', 'email' => 'admin@aquasecure.fr', 'password' => Hash::make('password')]);
+            ?? User::factory()->create(['role' => 'admin', 'name' => 'Admin AquaSecure', 'email' => 'admin@aquasecure.fr', 'password' => Hash::make('password'), 'email_verified_at' => now()]);
 
         $manager = User::where('role', 'manager')->first()
-            ?? User::factory()->create(['role' => 'manager', 'name' => 'Manager AquaSecure', 'email' => 'manager@aquasecure.fr', 'password' => Hash::make('password')]);
+            ?? User::factory()->create(['role' => 'manager', 'name' => 'Manager AquaSecure', 'email' => 'manager@aquasecure.fr', 'password' => Hash::make('password'), 'email_verified_at' => now()]);
 
         $projects = [
             [

@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
-use App\Models\Technicien;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -94,7 +94,7 @@ class BrevoEmailService
      *
      * @return array{success: bool, message_id: ?string, error: ?string}
      */
-    public function sendClosureNotification(Maintenance $maintenance, Technicien $technician): array
+    public function sendClosureNotification(Maintenance $maintenance, User $technician): array
     {
         if (empty($technician->email) || !filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
             return [
@@ -127,7 +127,7 @@ class BrevoEmailService
      *
      * @return array{success: bool, message_id: ?string, error: ?string}
      */
-    public function sendCorrectionsRequestedNotification(Maintenance $maintenance, Technicien $technician, string $notes): array
+    public function sendCorrectionsRequestedNotification(Maintenance $maintenance, User $technician, string $notes): array
     {
         if (empty($technician->email) || !filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
             return [

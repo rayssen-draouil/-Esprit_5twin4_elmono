@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Exceptions\GroqAiException;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
-use App\Models\Technicien;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -32,7 +32,7 @@ class AiMaintenancePlannerService
         ])->findOrFail($infrastructureId);
 
         // 2. Fetch technicians and existing workload
-        $technicians = Technicien::all(['id', 'name', 'speciality', 'status']);
+        $technicians = User::technicians()->get(['id', 'name', 'speciality', 'status']);
         $specialities = $technicians->pluck('speciality')->filter()->unique()->values()->toArray();
 
         // Check active operations on this infrastructure

@@ -113,7 +113,7 @@ $financementsPendingAmount = $financements->where('validation_status', 'pending_
                 'type' => 'projet',
                 'title' => $project->name,
                 'resource_id' => $project->id,
-                'submitted_at' => $this->getLastSubmitDate($project->decisionHistories),
+                'submitted_at' => $this->getLastSubmitDate($project->decisionHistories) ?? $project->created_at?->toISOString(),
                 'url' => route('projects.show', $project),
             ];
         }
@@ -122,7 +122,7 @@ $financementsPendingAmount = $financements->where('validation_status', 'pending_
                 'type' => 'financement',
                 'title' => $financement->source,
                 'resource_id' => $financement->id,
-                'submitted_at' => $this->getLastSubmitDate($financement->decisionHistories),
+                'submitted_at' => $this->getLastSubmitDate($financement->decisionHistories) ?? $financement->created_at?->toISOString(),
                 'url' => route('financements.show', $financement),
             ];
         }

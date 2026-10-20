@@ -119,7 +119,7 @@
             </span>
             <span>
                 <strong>{{ Auth::user()->name }}</strong>
-                <small>{{ ucfirst(Auth::user()->role) }}</small>
+                <small>{{ Auth::user()->roleLabel() }}</small>
             </span>
         </div>
     </div>

@@ -57,7 +57,7 @@ class MaintenanceAssignmentInvitation extends Model
 
     public function technician(): BelongsTo
     {
-        return $this->belongsTo(Technicien::class, 'technician_id');
+        return $this->belongsTo(User::class, 'technician_id');
     }
 
     public function manager(): BelongsTo
