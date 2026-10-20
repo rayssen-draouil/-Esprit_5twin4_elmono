@@ -67,6 +67,16 @@
                 ◒ <span>Financement</span>
             </a>
 
+            <a class="{{ request()->routeIs('back.financial.dashboard') ? 'active' : '' }}"
+               href="{{ route('back.financial.dashboard') }}">
+                ⚖ <span>Tableau de bord financier</span>
+            </a>
+
+            <a class="{{ request()->routeIs('back.pilotage') ? 'active' : '' }}"
+               href="{{ route('back.pilotage') }}">
+                📊 <span>Centre de pilotage</span>
+            </a>
+
             <p class="sidebar-label">MANAGEMENT</p>
 
             @if(Auth::user()->role === 'admin')

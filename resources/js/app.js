@@ -1,5 +1,8 @@
+import 'chart.js';
 import './bootstrap';
 import './infra-validation';
+
+window.Chart = require('chart.js');
 
 document.querySelector('.menu-toggle')?.addEventListener('click', () => {
     document.querySelector('.site-header nav')?.classList.toggle('mobile-open');

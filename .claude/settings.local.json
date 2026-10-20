@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep -l \"pagination\")",
+      "Bash(php artisan *)",
+      "Bash(grep -n \"CREATE TABLE\" aquasecure_mysql.sql | head -50; echo \"---PROJECTS---\"; sed -n '/CREATE TABLE.*projects/,/\\);/p' aquasecure_mysql.sql | head -30)",
+      "Bash(Get-Service)",
+      "Bash(php -v)",
+      "Bash(php -m)",
+      "Bash(/c/xampp/mysql/bin/mysqld --version)",
+      "Bash(/c/xampp/mysql/bin/mysqld --user=root --datadir=\"/c/xampp/mysql/data\")",
+      "Bash(/c/xampp/mysql/bin/mysqladmin -u root ping)",
+      "Bash(/c/xampp/mysql/bin/mysql -u root -e \"SHOW DATABASES;\")",
+      "Bash(/c/xampp/mysql/bin/mysql -u root aquasecure -e \"SHOW TABLES;\")",
+      "Bash(/c/xampp/mysql/bin/mysql -u root aquasecure -e \"SELECT COUNT\\(*\\) projects FROM projects; SELECT COUNT\\(*\\) financements FROM financements; SELECT COUNT\\(*\\) users FROM users; SELECT id,name,budget,status FROM projects LIMIT 10; SELECT id,source,amount,status FROM financements LIMIT 10;\")",
+      "Bash(mysql -u root -e \"SHOW TABLES FROM aquasecure LIKE 'expense%';\")"
+    ],
+    "additionalDirectories": [
+      "C:\\rayssen\\Laravel esprit\\AquaSecure"
+    ]
+  }
+}

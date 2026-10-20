@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(ZoneSeeder::class);
+        $this->call(RealProjectsSeeder::class);
 
         // 1. Users
         $admin = User::updateOrCreate(
