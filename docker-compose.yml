@@ -1,0 +1,117 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aquasecure-web:local
+    ports:
+      - "127.0.0.1:${AQUASECURE_HTTP_PORT:-8080}:80"
+    environment:
+      APP_NAME: AquaSecure
+      APP_ENV: local
+      APP_KEY: ${APP_KEY:?Set APP_KEY in .env (generate it with php artisan key:generate --show)}
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:${AQUASECURE_HTTP_PORT:-8080}
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /data/aquasecure.sqlite
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: log
+      BREVO_MAIL_DRIVER: api
+      BREVO_API_KEY: ""
+      AI_API_KEY: ""
+      GROQ_API_KEY: ""
+      TELEGRAM_BOT_TOKEN: ""
+      CHAT_AI_API_KEY: ollama
+      CHAT_AI_BASE_URL: http://host.docker.internal:11434/v1
+      AI_CLASSIFICATION_URL: http://classifier:5000
+    volumes:
+      - aquasecure-sqlite:/data
+      - aquasecure-storage:/var/www/html/storage
+    depends_on:
+      classifier:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/up >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  classifier:
+    build:
+      context: .
+      dockerfile: AquaSecure_AI_Classification/Dockerfile
+    image: aquasecure-classifier:local
+    expose:
+      - "5000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json, urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)); assert data.get('model_loaded') is True"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.28.0
+    profiles: [observability]
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+    volumes:
+      - ./monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    expose:
+      - "9115"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    profiles: [observability]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9091}:9090"
+    depends_on:
+      web:
+        condition: service_healthy
+      classifier:
+        condition: service_healthy
+      blackbox:
+        condition: service_started
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.3.0
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set a strong GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  aquasecure-sqlite:
+  aquasecure-storage:
+  prometheus-data:
+  grafana-data:

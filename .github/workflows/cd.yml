@@ -1,0 +1,30 @@
+name: CD (deployment scaffold)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  deployment-prerequisites:
+    name: Production deployment prerequisites
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment: production
+    steps:
+      - name: Stop until a real deployment target is configured
+        run: |
+          echo "CD is a scaffold only: no hosting target, deployment adapter, health check, or rollback procedure is configured." >&2
+          echo "Do not set DEPLOY_ENABLED=true until these have been implemented and reviewed." >&2
+          exit 1

@@ -1,0 +1,34 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "min": 0, "max": 1, "decimals": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "probe_success", "legendFormat": "{{instance}}", "refId": "A" }],
+      "title": "Disponibilité HTTP (1 = sain)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "probe_duration_seconds", "legendFormat": "{{instance}}", "refId": "A" }],
+      "title": "Durée des sondes HTTP",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["aquasecure", "health"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "title": "AquaSecure - santé des services",
+  "uid": "aquasecure-health",
+  "version": 1
+}
