@@ -54,6 +54,10 @@ return [
         // Ollama local est parfois lent au premier jeton (chargement du modèle).
         'timeout' => (int) env('CHAT_AI_TIMEOUT', 120),
 
+        // Nombre maximal de tokens de sortie par answer (borne la durée de
+        // génération sur un modèle lent, ex : 14b sur CPU).
+        'max_tokens' => (int) env('CHAT_AI_MAX_OUTPUT', 400),
+
         // Nombre maximal de messages d'historique conservés en session.
         'max_history' => (int) env('CHAT_AI_MAX_HISTORY', 10),
     ],

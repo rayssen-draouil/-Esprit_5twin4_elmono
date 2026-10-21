@@ -3,12 +3,17 @@
 namespace App\Http\Controllers\Technician;
 
 use App\Http\Controllers\Controller;
+use App\Models\Equipement;
+use App\Models\Intervention;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Services\MaintenanceLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class TechnicianInterventionController extends Controller
@@ -46,6 +51,8 @@ class TechnicianInterventionController extends Controller
 
         $query = Maintenance::with(['infrastructure.zone'])
             ->where('technician_id', $technician?->id ?? 0);
+        $interventionQuery = Intervention::with(['incident.infrastructure', 'incident.zone', 'equipements'])
+            ->where('technician_id', $technician?->id ?? 0);
 
         $filter = $request->input('status', 'all');
 
@@ -57,6 +64,12 @@ class TechnicianInterventionController extends Controller
             $query->where('status', 'awaiting_validation');
         } elseif ($filter === 'completed') {
             $query->where('status', 'completed');
+        } elseif ($filter === 'cancelled') {
+            $query->where('status', 'cancelled');
+        }
+
+        if ($filter !== 'all') {
+            $interventionQuery->where('status', $filter);
         }
 
         $maintenances = $query->orderByRaw("CASE
@@ -69,16 +82,97 @@ class TechnicianInterventionController extends Controller
             ->paginate(10)
             ->withQueryString();
 
+        $assignedInterventions = $interventionQuery
+            ->with(['incident.zone', 'equipements'])
+            ->latest('scheduled_at')
+            ->paginate(10, ['*'], 'interventions_page')
+            ->withQueryString();
+
+        $equipements = Equipement::query()
+            ->with(['interventions' => fn ($query) => $query
+                ->with('technician')
+                ->whereNotIn('interventions.status', ['completed', 'cancelled'])
+                ->orderBy('interventions.scheduled_at')])
+            ->orderBy('name')
+            ->get();
+        $availableEquipementIds = $equipements
+            ->filter(fn (Equipement $equipement): bool => $equipement->status === 'available' && $equipement->interventions->isEmpty())
+            ->pluck('id')
+            ->all();
+
         // Counts for tabs
         $stats = [
-            'all' => Maintenance::where('technician_id', $technician?->id ?? 0)->count(),
-            'in_progress' => Maintenance::where('technician_id', $technician?->id ?? 0)->where('status', 'in_progress')->count(),
+            'all' => Maintenance::where('technician_id', $technician?->id ?? 0)->count() + Intervention::where('technician_id', $technician?->id ?? 0)->count(),
+            'in_progress' => Maintenance::where('technician_id', $technician?->id ?? 0)->where('status', 'in_progress')->count() + Intervention::where('technician_id', $technician?->id ?? 0)->where('status', 'in_progress')->count(),
             'awaiting_validation' => Maintenance::where('technician_id', $technician?->id ?? 0)->where('status', 'awaiting_validation')->count(),
-            'planned' => Maintenance::where('technician_id', $technician?->id ?? 0)->where('status', 'planned')->count(),
-            'completed' => Maintenance::where('technician_id', $technician?->id ?? 0)->where('status', 'completed')->count(),
+            'planned' => Maintenance::where('technician_id', $technician?->id ?? 0)->where('status', 'planned')->count() + Intervention::where('technician_id', $technician?->id ?? 0)->where('status', 'planned')->count(),
+            'completed' => Maintenance::where('technician_id', $technician?->id ?? 0)->where('status', 'completed')->count() + Intervention::where('technician_id', $technician?->id ?? 0)->where('status', 'completed')->count(),
         ];
 
-        return view('techniciens.interventions.index', compact('maintenances', 'technician', 'filter', 'stats'));
+        return view('techniciens.interventions.index', compact(
+            'maintenances', 'assignedInterventions', 'equipements', 'availableEquipementIds', 'technician', 'filter', 'stats'
+        ));
+    }
+
+    public function respondToIntervention(Request $request, Intervention $intervention): RedirectResponse
+    {
+        $technician = $this->getTechnician();
+        if (! $technician || (int) $intervention->technician_id !== (int) $technician->id) {
+            abort(403, 'Vous ne pouvez répondre qu’à vos propres interventions.');
+        }
+        if ($intervention->technician_response !== 'pending' || $intervention->status !== 'planned') {
+            return redirect()->route('technicien.interventions.index')->with('error', 'Cette intervention ne peut plus recevoir de réponse.');
+        }
+
+        $validated = $request->validate([
+            'response' => ['required', Rule::in(['confirmed', 'refused'])],
+            'equipements' => ['nullable', 'array'],
+            'equipements.*' => ['integer', 'distinct', Rule::exists('equipements', 'id')],
+        ]);
+        if ($validated['response'] === 'confirmed' && empty($validated['equipements'])) {
+            return back()->withErrors(['equipements' => 'Sélectionnez au moins un équipement avant de confirmer.'])->withInput();
+        }
+
+        DB::transaction(function () use ($intervention, $validated, $technician): void {
+            $lockedIntervention = Intervention::query()->whereKey($intervention->id)->lockForUpdate()->firstOrFail();
+            if ((int) $lockedIntervention->technician_id !== (int) $technician->id
+                || $lockedIntervention->technician_response !== 'pending'
+                || $lockedIntervention->status !== 'planned') {
+                abort(403, 'Cette intervention ne peut plus recevoir de réponse.');
+            }
+
+            $selectedIds = $validated['equipements'] ?? [];
+            $lockedIds = Equipement::query()->where('status', 'available')->whereIn('id', $selectedIds)
+                ->orderBy('id')->lockForUpdate()->pluck('id')->all();
+            if (count($lockedIds) !== count($selectedIds)) {
+                throw ValidationException::withMessages(['equipements' => 'Un ou plusieurs équipements ne sont plus disponibles.']);
+            }
+
+            $reservedIds = $selectedIds === [] ? [] : DB::table('equipement_intervention')
+                ->join('interventions', 'interventions.id', '=', 'equipement_intervention.intervention_id')
+                ->whereIn('equipement_intervention.equipement_id', $selectedIds)
+                ->where('interventions.id', '!=', $lockedIntervention->id)
+                ->whereNotIn('interventions.status', ['completed', 'cancelled'])
+                ->pluck('equipement_intervention.equipement_id')->unique()->values()->all();
+            if ($reservedIds !== []) {
+                throw ValidationException::withMessages(['equipements' => 'Un ou plusieurs équipements sont déjà réservés par une intervention active.']);
+            }
+
+            $confirmed = $validated['response'] === 'confirmed';
+            $lockedIntervention->equipements()->sync($confirmed ? $selectedIds : []);
+            $lockedIntervention->update([
+                'technician_response' => $validated['response'],
+                'technician_response_at' => now(),
+                ...($confirmed ? ['status' => 'in_progress', 'started_at' => now()] : []),
+            ]);
+            if ($confirmed) {
+                app(\App\Services\EquipmentReservationService::class)->syncStatus($selectedIds);
+            }
+        });
+
+        return redirect()->route('technicien.interventions.index')->with('success', $validated['response'] === 'confirmed'
+            ? 'Intervention confirmée et démarrée avec les équipements sélectionnés.'
+            : 'Intervention refusée.');
     }
 
     /**

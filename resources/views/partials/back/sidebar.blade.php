@@ -30,6 +30,11 @@
                 ▦ <span>Infrastructures</span>
             </a>
 
+            <a class="{{ request()->routeIs('equipements.*') ? 'active' : '' }}"
+               href="{{ route('equipements.index') }}">
+                <span aria-hidden="true">🧰</span> <span>Équipements</span>
+            </a>
+
             <a class="{{ request()->routeIs('maintenances.*') ? 'active' : '' }}"
                href="{{ route('maintenances.index') }}">
                 ⛯ <span>Maintenances</span>

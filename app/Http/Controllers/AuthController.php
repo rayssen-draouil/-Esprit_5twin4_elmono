@@ -66,6 +66,10 @@ class AuthController extends Controller
             $user->sendEmailVerificationNotification();
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Failed to send verification email on registration: ' . $e->getMessage());
+
+            return redirect()->route('verification.notice')->withErrors([
+                'email' => "Votre compte a été créé, mais l'e-mail de vérification n'a pas pu être envoyé. Vous pouvez réessayer avec le bouton ci-dessous.",
+            ]);
         }
 
         return redirect()->route('verification.notice')->with('success', 'Votre compte a été créé. Vérifiez votre adresse e-mail.');

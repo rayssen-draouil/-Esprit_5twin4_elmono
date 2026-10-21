@@ -933,7 +933,7 @@ PROMPT;
     /**
      * Surcharge de configuration par appel (Ollama local).
      *
-     * @return array{base_url: string, key: string, model: string, timeout: int, connect_timeout: int}
+     * @return array{base_url: string, key: string, model: string, timeout: int, connect_timeout: int, max_tokens: int}
      */
     protected function chatOverrides(): array
     {
@@ -945,6 +945,7 @@ PROMPT;
             'model' => (string) config('ai.chat.model', 'llama3.1:8b'),
             'timeout' => $timeout,
             'connect_timeout' => min(10, max(3, $timeout)),
+            'max_tokens' => (int) config('ai.chat.max_tokens', 400),
         ];
     }
 

@@ -1539,7 +1539,8 @@
 }
 
 [data-theme='dark'] .site-header {
-    background: #08171a;
+    background: rgb(8 23 26 / .88);
+    box-shadow: 0 1px 0 rgb(220 231 229 / .12);
 }
 
 [data-theme='dark'] .site-header nav {
@@ -1825,8 +1826,14 @@
  * Navigation principale (header public)
  * ===================================================================== */
 .site-header {
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 60;
     gap: 18px;
+    background: rgb(247 250 249 / .88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 1px 0 var(--line);
 }
 
 .site-header .brand {

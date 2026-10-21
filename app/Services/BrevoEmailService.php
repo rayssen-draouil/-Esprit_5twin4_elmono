@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
+use App\Models\Intervention;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 
 class BrevoEmailService
 {
@@ -86,6 +88,83 @@ class BrevoEmailService
             recipientName: $technician->name,
             subject: $subject,
             htmlContent: $html
+        );
+    }
+
+    /**
+     * Notify a technician when an intervention is assigned to their account.
+     *
+     * @return array{success: bool, message_id: ?string, error: ?string}
+     */
+    public function sendInterventionAssignmentNotification(Intervention $intervention, User $technician): array
+    {
+        if (empty($technician->email) || ! filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => 'Adresse email du technicien invalide ou manquante.'];
+        }
+
+        $intervention->loadMissing('incident');
+        $html = view('emails.interventions.assigned', [
+            'technician' => $technician,
+            'intervention' => $intervention,
+            'interventionUrl' => route('interventions.show', $intervention),
+        ])->render();
+
+        return $this->sendTransactionalEmail(
+            recipientEmail: $technician->email,
+            recipientName: $technician->name,
+            subject: "Nouvelle intervention assignée — #{$intervention->id}",
+            htmlContent: $html,
+        );
+    }
+
+    /**
+     * Send a password reset link through Brevo SMTP or its REST API fallback.
+     *
+     * @return array{success: bool, message_id: ?string, error: ?string}
+     */
+    public function sendPasswordResetNotification(User $user, string $token): array
+    {
+        if (empty($user->email) || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => 'Adresse email invalide ou manquante.'];
+        }
+
+        $resetUrl = route('password.reset', [
+            'token' => $token,
+            'email' => $user->getEmailForPasswordReset(),
+        ]);
+        $html = view('emails.auth.password-reset', compact('user', 'resetUrl'))->render();
+
+        return $this->sendTransactionalEmail(
+            recipientEmail: $user->email,
+            recipientName: $user->name,
+            subject: 'Réinitialisation de votre mot de passe AquaSecure',
+            htmlContent: $html,
+        );
+    }
+
+    /**
+     * Send a signed account verification link through Brevo.
+     *
+     * @return array{success: bool, message_id: ?string, error: ?string}
+     */
+    public function sendEmailVerificationNotification(User $user): array
+    {
+        if (empty($user->email) || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => 'Adresse email invalide ou manquante.'];
+        }
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes((int) config('auth.verification.expire', 60)),
+            ['id' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],
+        );
+        $html = view('emails.auth.verify-email', compact('user', 'verificationUrl'))->render();
+
+        return $this->sendTransactionalEmail(
+            recipientEmail: $user->email,
+            recipientName: $user->name,
+            subject: 'Vérifiez votre adresse e-mail AquaSecure',
+            htmlContent: $html,
         );
     }
 

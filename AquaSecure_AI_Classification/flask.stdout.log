@@ -1,0 +1,7 @@
+Modèle chargé depuis C:\Users\KF7\Documents\-Esprit_5twin4_elmono\AquaSecure_AI_Classification\model_signalement.joblib
+Démarrage de l'API Flask de classification AquaSecure...
+Endpoints disponibles:
+  GET  /health - Vérifier le statut
+  POST /predict - Classifier une description
+ * Serving Flask app 'app'
+ * Debug mode: on

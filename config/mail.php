@@ -14,7 +14,10 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    // Laravel's built-in verification notification uses the default mailer.
+    // Fall back to the configured Brevo driver so verification emails use the
+    // same SMTP/API setup as the application's other transactional emails.
+    'default' => env('MAIL_MAILER', env('BREVO_MAIL_DRIVER', 'smtp')),
 
     /*
     |--------------------------------------------------------------------------
@@ -109,7 +112,7 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', env('EMAIL_FROM', 'hello@example.com')),
+        'address' => env('MAIL_FROM_ADDRESS', env('BREVO_SENDER_EMAIL', env('EMAIL_FROM', 'hello@example.com'))),
         'name' => env('MAIL_FROM_NAME', env('BREVO_SENDER_NAME', 'AquaSecure')),
     ],
 

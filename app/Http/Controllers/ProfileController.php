@@ -26,7 +26,13 @@ class ProfileController extends Controller
         $user->update($data);
 
         if ($user->email_verified_at === null) {
-            $user->sendEmailVerificationNotification();
+            try {
+                $user->sendEmailVerificationNotification();
+            } catch (\Throwable $exception) {
+                report($exception);
+
+                return back()->withErrors(['email' => 'Votre adresse a été modifiée, mais le courriel de vérification n’a pas pu être envoyé. Réessayez depuis la page de vérification.']);
+            }
         }
 
         return back()->with('success', 'Profil mis à jour avec succès.');

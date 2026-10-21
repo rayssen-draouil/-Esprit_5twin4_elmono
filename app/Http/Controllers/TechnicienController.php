@@ -24,6 +24,9 @@ class TechnicienController extends Controller
                     ->orWhereHas('interventions');
             })
             ->withCount('interventions')
+            ->withExists([
+                'interventions as is_on_intervention' => fn ($query) => $query->where('status', 'in_progress'),
+            ])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = '%' . $request->input('search') . '%';
                 $query->where(function ($builder) use ($search) {
@@ -32,7 +35,22 @@ class TechnicienController extends Controller
                         ->orWhere('speciality', 'like', $search);
                 });
             })
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->input('status')))
+            ->when($request->filled('status'), function ($query) use ($request): void {
+                $status = $request->input('status');
+                if ($status === 'busy') {
+                    $query->where(function ($builder): void {
+                        $builder->where('status', 'busy')->orWhere(function ($active): void {
+                            $active->where('status', '!=', 'inactive')
+                                ->whereHas('interventions', fn ($interventions) => $interventions->where('status', 'in_progress'));
+                        });
+                    });
+                } elseif ($status === 'available') {
+                    $query->where('status', 'available')
+                        ->whereDoesntHave('interventions', fn ($interventions) => $interventions->where('status', 'in_progress'));
+                } else {
+                    $query->where('status', $status);
+                }
+            })
             ->orderBy('name')
             ->paginate(10)
             ->withQueryString();
@@ -64,6 +82,10 @@ class TechnicienController extends Controller
 
     public function show(User $technicien): View
     {
+        $technicien->loadExists([
+            'interventions as is_on_intervention' => fn ($query) => $query->where('status', 'in_progress'),
+        ]);
+
         return view('techniciens.show', [
             'technician' => $technicien->load(['interventions.incident', 'maintenances.infrastructure']),
         ]);

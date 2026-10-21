@@ -2,7 +2,8 @@
     $isHome = request()->routeIs('home');
     $isZones = request()->routeIs('front.zones.*', 'front.alerts.*');
     $isTrack = request()->routeIs('front.track');
-    $isNetwork = request()->routeIs('front.infrastructures.*', 'front.incidents.*', 'front.projects.*', 'front.funding');
+    $isIncidents = request()->routeIs('front.incidents.*');
+    $isNetwork = request()->routeIs('front.infrastructures.*', 'front.projects.*', 'front.funding');
 @endphp
 <header class="site-header" data-site-header>
     <a class="brand" href="{{ route('home') }}" aria-label="AquaSecure, accueil">
@@ -14,6 +15,7 @@
         <a class="site-nav__link {{ $isHome ? 'is-active' : '' }}" href="{{ route('home') }}" @if($isHome) aria-current="page" @endif>État du réseau</a>
         <a class="site-nav__link {{ $isZones ? 'is-active' : '' }}" href="{{ route('front.zones.index') }}" @if($isZones) aria-current="page" @endif>Zones</a>
         <a class="site-nav__link {{ $isTrack ? 'is-active' : '' }}" href="{{ route('front.track') }}" @if($isTrack) aria-current="page" @endif>Suivi</a>
+        <a class="site-nav__link {{ $isIncidents ? 'is-active' : '' }}" href="{{ route('front.incidents.index') }}" @if($isIncidents) aria-current="page" @endif>Incidents</a>
 
         <div class="site-nav__dropdown" data-nav-dropdown>
             <button type="button"
@@ -27,7 +29,6 @@
             </button>
             <div class="site-nav__menu" id="site-nav-network" data-nav-dropdown-menu hidden>
                 <a href="{{ route('front.infrastructures.index') }}" @if(request()->routeIs('front.infrastructures.*')) aria-current="page" @endif>Infrastructures</a>
-                <a href="{{ route('front.incidents.index') }}" @if(request()->routeIs('front.incidents.*')) aria-current="page" @endif>Incidents</a>
                 <a href="{{ route('front.projects.index') }}" @if(request()->routeIs('front.projects.*')) aria-current="page" @endif>Projets</a>
                 <a href="{{ route('front.funding') }}" @if(request()->routeIs('front.funding')) aria-current="page" @endif>Financement</a>
             </div>

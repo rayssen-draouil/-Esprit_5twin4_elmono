@@ -57,6 +57,18 @@ class UserAuthenticationTest extends TestCase
         $this->actingAs($user)->get(route('projects.index'))->assertRedirect(route('verification.notice'));
     }
 
+    public function test_valid_signed_verification_link_marks_email_as_verified(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => null]);
+        $verificationUrl = (new VerifyEmail())->toMail($user)->actionUrl;
+
+        $this->actingAs($user)
+            ->get($verificationUrl)
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertNotNull($user->fresh()->email_verified_at);
+    }
+
     public function test_two_factor_challenge_requires_a_valid_totp_code(): void
     {
         $user = User::factory()->create(['email_verified_at' => now()]);

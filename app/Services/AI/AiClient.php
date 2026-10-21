@@ -179,6 +179,12 @@ class AiClient
             'temperature' => (float) ($overrides['temperature'] ?? config('ai.temperature', 0.2)),
         ], $extra);
 
+        // Limite optionnelle de tokens de sortie (payload max_tokens). Utilisée
+        // par le chatbot local pour borner la durée de génération.
+        if (isset($overrides['max_tokens']) && (int) $overrides['max_tokens'] > 0) {
+            $payload['max_tokens'] = (int) $overrides['max_tokens'];
+        }
+
         $headers = [
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',

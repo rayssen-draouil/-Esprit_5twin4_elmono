@@ -75,6 +75,12 @@ class ProjectDoctorController extends Controller
                 'project_id' => $projectId,
             ]);
 
+            Log::debug('project.doctor.response', [
+                'user_id' => $user->id,
+                'intent' => $intent,
+                'result' => $result,
+            ]);
+
             $status = $result['success'] ?? false
                 ? 200
                 : (($result['code'] ?? null) === 'forbidden' ? 403 : 200);
@@ -85,6 +91,7 @@ class ProjectDoctorController extends Controller
                 'user_id' => $user->id,
                 'intent' => $intent,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([

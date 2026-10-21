@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Back\AiChatController;
 use App\Http\Controllers\Back\AiIntelligenceSuiteController;
 use App\Http\Controllers\Back\AlertAiController;
@@ -11,10 +12,12 @@ use App\Http\Controllers\Back\ZoneAiController;
 use App\Http\Controllers\Back\ZoneController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmailVerificationController;
+use App\Http\Controllers\EquipementController;
 use App\Http\Controllers\FinancementController;
 use App\Http\Controllers\Front\FrontController;
 use App\Http\Controllers\Front\PublicZoneAlertController;
 use App\Http\Controllers\InfrastructureController;
+use App\Http\Controllers\InterventionAiController;
 use App\Http\Controllers\InterventionController;
 use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\MaintenanceInvitationController;
@@ -205,6 +208,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->group(fu
 
 Route::middleware(['auth', 'verified', 'role:admin,manager,gestionnaire'])->prefix('admin')->group(function () {
     Route::resource('infrastructures', InfrastructureController::class)->names('infrastructures');
+    Route::resource('equipements', EquipementController::class)->names('equipements');
     Route::resource('maintenances', MaintenanceController::class)->names('maintenances');
     Route::post('/maintenances/{maintenance}/start', [MaintenanceController::class, 'start'])->name('maintenances.start');
     Route::post('/maintenances/{maintenance}/validate-completion', [MaintenanceController::class, 'validateCompletion'])->name('maintenances.validate-completion');
@@ -252,6 +256,9 @@ Route::middleware(['auth', 'verified', 'role:admin,manager,gestionnaire'])->pref
     Route::post('/financements/{financement}/submit', [FinancementController::class, 'submit'])->name('financements.submit');
     Route::post('/financements/{financement}/decide', [FinancementController::class, 'decide'])->name('financements.decide');
 
+    Route::post('/interventions/check-schedule/{intervention?}', [InterventionAiController::class, 'checkSchedule'])
+        ->name('interventions.check-schedule');
+
     Route::resource('interventions', InterventionController::class)
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
         ->names('interventions');
@@ -264,6 +271,10 @@ Route::middleware(['auth', 'verified', 'role:admin,manager,gestionnaire'])->pref
 // Dedicated Technician Workspace (Mes interventions)
 Route::middleware(['auth', 'role:technician,admin'])->prefix('technicien')->name('technicien.')->group(function () {
     Route::get('/interventions', [TechnicianInterventionController::class, 'index'])->name('interventions.index');
+    Route::post('/interventions/{intervention}/recommend-equipements', [InterventionAiController::class, 'recommendEquipment'])
+        ->name('interventions.recommend-equipements');
+    Route::post('/interventions/{intervention}/reponse', [TechnicianInterventionController::class, 'respondToIntervention'])
+        ->name('interventions.respond');
     Route::get('/interventions/{maintenance}', [TechnicianInterventionController::class, 'show'])->name('interventions.show');
     Route::post('/interventions/{maintenance}/complete', [TechnicianInterventionController::class, 'submitCompletion'])->name('interventions.complete');
     Route::post('/interventions/{maintenance}/prolong', [TechnicianInterventionController::class, 'prolong'])->name('interventions.prolong');

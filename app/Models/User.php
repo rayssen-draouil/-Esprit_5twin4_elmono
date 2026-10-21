@@ -51,6 +51,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'phone',
         'speciality',
+        'skills',
         'status',
         'telegram_chat_id',
         'telegram_linked_at',
@@ -130,15 +131,44 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Send password reset links through the configured Brevo transactional service.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $result = app(\App\Services\BrevoEmailService::class)->sendPasswordResetNotification($this, $token);
+
+        if (! $result['success']) {
+            throw new \RuntimeException('Password reset email could not be delivered.');
+        }
+    }
+
+    /** Send a signed verification link through the Brevo transactional service. */
+    public function sendEmailVerificationNotification(): void
+    {
+        $result = app(\App\Services\BrevoEmailService::class)->sendEmailVerificationNotification($this);
+
+        if (! $result['success']) {
+            throw new \RuntimeException('Email verification message could not be delivered.');
+        }
+    }
+
+    /**
      * Libellé lisible du statut opérationnel (techniciens).
      */
     public function getStatusLabelAttribute(): string
     {
-        return match ($this->status) {
+        return match ($this->display_status) {
             'busy' => 'Occupé',
             'inactive' => 'Inactif',
             default => 'Disponible',
         };
+    }
+
+    public function getDisplayStatusAttribute(): string
+    {
+        return $this->status !== 'inactive' && ($this->is_on_intervention ?? false)
+            ? 'busy'
+            : ($this->status ?? 'available');
     }
 
     /**

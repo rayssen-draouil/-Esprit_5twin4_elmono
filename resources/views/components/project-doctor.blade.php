@@ -753,7 +753,7 @@
             var card = buildCard(options.intent, options.data);
             if (card) { bubble.appendChild(card); }
 
-            var notes = buildNotes(options.data ? options.data.ia : null);
+            var notes = buildNotes(options.data ? (options.data.ia || options.data) : null);
             if (notes) { bubble.appendChild(notes); }
 
             var sources = buildSources(options.sources);
@@ -873,12 +873,16 @@
         setBusy(true);
         setLoadingText(requestedIntent);
 
+        var csrfToken = document.querySelector('meta[name="csrf-token"]')
+            ? document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            : '';
+
         fetch(route, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+                'X-CSRF-TOKEN': csrfToken
             },
             body: JSON.stringify({
                 intent: requestedIntent,
@@ -891,6 +895,13 @@
             });
         }).then(function (result) {
             var body = result.body || {};
+
+            // Debug logging
+            console.log('Project Doctor response:', {
+                status: result.status,
+                ok: result.ok,
+                body: body
+            });
 
             if (body.success && body.answer) {
                 appendMessage('bot', {
@@ -908,11 +919,13 @@
                     meta: 'Erreur (' + (body.code || result.status) + ')'
                 });
             } else {
+                console.error('Invalid response structure:', body);
                 showError(result.status === 429 ? 'Quota d\'appels atteint. Réessayez plus tard.'
                     : result.status === 403 ? 'Accès interdit à ce projet.'
-                    : 'Réponse invalide du service.');
+                    : 'Réponse invalide du service. (status: ' + result.status + ', success: ' + body.success + ', answer: ' + !!body.answer + ')');
             }
-        }).catch(function () {
+        }).catch(function (error) {
+            console.error('Project Doctor fetch error:', error);
             showError('Impossible de joindre le service. Vérifiez votre connexion.');
         }).finally(function () { setBusy(false); });
     }
