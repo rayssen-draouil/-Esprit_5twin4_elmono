@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CitizenStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -63,7 +64,7 @@ class Signalement extends Model
     /** Libellé citoyen du statut courant. */
     public function statusLabel(): string
     {
-        return \App\Support\CitizenStatus::signalementLabel($this->status);
+        return CitizenStatus::signalementLabel($this->status);
     }
 
     public function incident(): BelongsTo

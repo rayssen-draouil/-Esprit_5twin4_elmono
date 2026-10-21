@@ -7,7 +7,6 @@ use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\SubmitProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
 use App\Models\DecisionHistory;
-use App\Models\Financement;
 use App\Models\Project;
 use App\Models\User;
 use App\Notifications\ProjetDecision;
@@ -22,7 +21,7 @@ class ProjectController extends Controller
     public function index(Request $request): View
     {
         $query = Project::withCount('financements')->with('user');
-        $query->when($request->filled('search'), fn (Builder $builder) => $builder->where('name', 'like', '%' . $request->string('search') . '%'));
+        $query->when($request->filled('search'), fn (Builder $builder) => $builder->where('name', 'like', '%'.$request->string('search').'%'));
         $query->when($request->filled('status'), fn (Builder $builder) => $builder->where('status', $request->string('status')));
         $query->when($request->filled('type'), fn (Builder $builder) => $builder->where('type', $request->string('type')));
 

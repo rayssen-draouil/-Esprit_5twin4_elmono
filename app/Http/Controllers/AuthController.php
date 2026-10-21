@@ -8,9 +8,9 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
-use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 
 class AuthController extends Controller
 {
@@ -28,6 +28,7 @@ class AuthController extends Controller
 
         if (! Auth::validate($request->only('email', 'password'))) {
             RateLimiter::hit($key, 60);
+
             return back()->withErrors(['email' => 'Ces identifiants sont incorrects.'])->withInput();
         }
 
@@ -65,7 +66,7 @@ class AuthController extends Controller
         try {
             $user->sendEmailVerificationNotification();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to send verification email on registration: ' . $e->getMessage());
+            Log::error('Failed to send verification email on registration: '.$e->getMessage());
 
             return redirect()->route('verification.notice')->withErrors([
                 'email' => "Votre compte a été créé, mais l'e-mail de vérification n'a pas pu être envoyé. Vous pouvez réessayer avec le bouton ci-dessous.",

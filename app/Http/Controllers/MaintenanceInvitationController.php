@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MaintenanceAssignmentInvitation;
 use App\Services\TechnicianAssignmentInvitationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -27,7 +25,7 @@ class MaintenanceInvitationController extends Controller
     {
         $invitation = $this->invitationService->findByRawToken($token);
 
-        if (!$invitation || !$invitation->maintenance) {
+        if (! $invitation || ! $invitation->maintenance) {
             return view('maintenances.invitation-response', [
                 'token' => $token,
                 'invitation' => null,
@@ -39,7 +37,7 @@ class MaintenanceInvitationController extends Controller
         // Role verification: If logged in with another non-technician role, show creative page
         if (Auth::check()) {
             $user = Auth::user();
-            if (!$user->isTechnician() || ((int) $user->id !== (int) $invitation->technician_id && $user->role !== 'admin')) {
+            if (! $user->isTechnician() || ((int) $user->id !== (int) $invitation->technician_id && $user->role !== 'admin')) {
                 return view('maintenances.not-concerned', [
                     'token' => $token,
                     'invitation' => $invitation,
@@ -56,7 +54,7 @@ class MaintenanceInvitationController extends Controller
             }
         } else {
             // Frictionless secure login for the invited technician via verified secret token
-            if ($invitation->technician && $invitation->isPending() && !$invitation->hasExpired()) {
+            if ($invitation->technician && $invitation->isPending() && ! $invitation->hasExpired()) {
                 Auth::login($invitation->technician);
             }
         }
@@ -76,7 +74,7 @@ class MaintenanceInvitationController extends Controller
     {
         $invitation = $this->invitationService->findByRawToken($token);
 
-        if (!$invitation || !$invitation->maintenance) {
+        if (! $invitation || ! $invitation->maintenance) {
             return redirect()
                 ->route('maintenances.invitation.show', ['token' => $token])
                 ->with('error', "Jeton d'invitation introuvable ou expiré.");
@@ -85,7 +83,7 @@ class MaintenanceInvitationController extends Controller
         // If authenticated user is NOT the technician, display creative not-concerned page
         if (Auth::check()) {
             $user = Auth::user();
-            if (!$user->isTechnician() || ((int) $user->id !== (int) $invitation->technician_id && $user->role !== 'admin')) {
+            if (! $user->isTechnician() || ((int) $user->id !== (int) $invitation->technician_id && $user->role !== 'admin')) {
                 return view('maintenances.not-concerned', [
                     'token' => $token,
                     'invitation' => $invitation,
@@ -102,7 +100,7 @@ class MaintenanceInvitationController extends Controller
 
         $result = $this->invitationService->acceptInvitation($token);
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             return redirect()
                 ->route('maintenances.invitation.show', ['token' => $token])
                 ->with('error', $result['message']);
@@ -128,7 +126,7 @@ class MaintenanceInvitationController extends Controller
         $reason = $request->input('decline_reason');
         $result = $this->invitationService->declineInvitation($token, $reason);
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             return redirect()
                 ->route('maintenances.invitation.show', ['token' => $token])
                 ->with('error', $result['message']);

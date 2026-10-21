@@ -179,7 +179,7 @@ class AiIntelligenceSuiteController extends Controller
 
         $details = $validator->validated();
 
-        if (!empty($details['infrastructure_id'])) {
+        if (! empty($details['infrastructure_id'])) {
             $infra = Infrastructure::with('zone')->find($details['infrastructure_id']);
             if ($infra) {
                 $details['infrastructure_name'] = $infra->name;
@@ -194,14 +194,14 @@ class AiIntelligenceSuiteController extends Controller
             return response()->json([
                 'success' => true,
                 'recommendations' => $recommendations,
-                'message' => "Recommandations de techniciens formulées avec succès.",
+                'message' => 'Recommandations de techniciens formulées avec succès.',
             ]);
         } catch (\Throwable $e) {
             Log::error('Technician matchmaker error', ['error' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
-                'message' => "Erreur lors de la recherche des techniciens optimaux.",
+                'message' => 'Erreur lors de la recherche des techniciens optimaux.',
             ], 500);
         }
     }
@@ -224,7 +224,7 @@ class AiIntelligenceSuiteController extends Controller
 
         $techId = (int) $request->input('technician_id');
         $technician = User::technicians()->find($techId);
-        if (!$technician) {
+        if (! $technician) {
             return response()->json([
                 'success' => false,
                 'message' => 'Le technicien sélectionné est introuvable.',
@@ -234,7 +234,7 @@ class AiIntelligenceSuiteController extends Controller
         if ($technician->status === 'inactive') {
             return response()->json([
                 'success' => false,
-                'message' => "Le technicien sélectionné est inactif et ne peut pas être affecté.",
+                'message' => 'Le technicien sélectionné est inactif et ne peut pas être affecté.',
             ], 422);
         }
 
@@ -245,7 +245,7 @@ class AiIntelligenceSuiteController extends Controller
                 managerId: Auth::id()
             );
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 return response()->json([
                     'success' => false,
                     'message' => $result['message'],

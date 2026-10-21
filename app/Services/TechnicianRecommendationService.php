@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Exceptions\GroqAiException;
-use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -22,15 +20,12 @@ class TechnicianRecommendationService
      * L'IA classe les meilleurs candidats ; l'ensemble de l'effectif
      * technicien est néanmoins restitué afin que le manager puisse affecter
      * n'importe quel technicien de l'équipe.
-     *
-     * @param array $taskDetails
-     * @return array
      */
     public function recommend(array $taskDetails): array
     {
         // 1. Resolve task context
         $maintenance = null;
-        if (!empty($taskDetails['maintenance_id'])) {
+        if (! empty($taskDetails['maintenance_id'])) {
             $maintenance = Maintenance::with('infrastructure.zone')->find($taskDetails['maintenance_id']);
         }
 
@@ -95,7 +90,7 @@ class TechnicianRecommendationService
         $technicians = User::technicians()->withCount([
             'maintenances as active_maintenances_count' => fn ($q) => $q->whereIn('status', ['planned', 'in_progress']),
         ])
-        ->get();
+            ->get();
 
         return $technicians->map(function ($tech) use ($maintType, $infraType) {
             $speciality = (string) $tech->speciality;
@@ -112,9 +107,9 @@ class TechnicianRecommendationService
                 'selectable' => $status !== 'inactive',
             ];
         })
-        ->sortByDesc('compatibility_score')
-        ->sortBy('active_workload')
-        ->values();
+            ->sortByDesc('compatibility_score')
+            ->sortBy('active_workload')
+            ->values();
     }
 
     /**
@@ -200,7 +195,7 @@ class TechnicianRecommendationService
      */
     protected function callGroqMatchmaker(Collection $candidates, array $task): array
     {
-        $systemPrompt = <<<PROMPT
+        $systemPrompt = <<<'PROMPT'
 Vous êtes le coordinateur d'affectation des équipes d'intervention hydraulique pour la plateforme AquaSecure.
 Votre rôle est de classer jusqu'à 3 techniciens les plus adaptés pour une intervention de maintenance donnée en vous basant STRICTEMENT sur les candidats réels fournis.
 
@@ -212,23 +207,23 @@ RÈGLES D'INTEGRITÉ :
 PROMPT;
 
         $userPrompt = "Voici les détails de la mission de maintenance et les techniciens éligibles :\n\n"
-            . json_encode([
+            .json_encode([
                 'mission' => $task,
                 'eligible_candidates' => $candidates->toArray(),
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-            . "\n\nClassez les 3 meilleurs techniciens sous forme d'un objet JSON contenant :\n"
-            . "- maintenance_id : ID de la maintenance ou null\n"
-            . "- candidate_rankings : Tableau de 1 à 3 objets classés contenant :\n"
-            . "    * technician_id : ID numérique exact\n"
-            . "    * rank : 1, 2 ou 3\n"
-            . "    * specialty_match : 'Excellente' | 'Bonne' | 'Partielle'\n"
-            . "    * availability_summary : Synthèse de disponibilité\n"
-            . "    * workload_summary : Évaluation de la charge actuelle\n"
-            . "    * reasoning : Justification technique du choix\n"
-            . "    * advantages : Tableau des points forts de ce profil pour la mission\n"
-            . "    * limitations : Tableau des contraintes ou points de vigilance\n"
-            . "    * requires_manager_review : true ou false\n"
-            . "- no_suitable_candidate_reason : null ou motif si aucun profil n'est adéquat\n";
+            ."\n\nClassez les 3 meilleurs techniciens sous forme d'un objet JSON contenant :\n"
+            ."- maintenance_id : ID de la maintenance ou null\n"
+            ."- candidate_rankings : Tableau de 1 à 3 objets classés contenant :\n"
+            ."    * technician_id : ID numérique exact\n"
+            ."    * rank : 1, 2 ou 3\n"
+            ."    * specialty_match : 'Excellente' | 'Bonne' | 'Partielle'\n"
+            ."    * availability_summary : Synthèse de disponibilité\n"
+            ."    * workload_summary : Évaluation de la charge actuelle\n"
+            ."    * reasoning : Justification technique du choix\n"
+            ."    * advantages : Tableau des points forts de ce profil pour la mission\n"
+            ."    * limitations : Tableau des contraintes ou points de vigilance\n"
+            ."    * requires_manager_review : true ou false\n"
+            ."- no_suitable_candidate_reason : null ou motif si aucun profil n'est adéquat\n";
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -248,15 +243,21 @@ PROMPT;
         $validRankings = [];
 
         foreach ($rawRankings as $index => $item) {
-            if (!is_array($item)) continue;
+            if (! is_array($item)) {
+                continue;
+            }
             $techId = (int) ($item['technician_id'] ?? 0);
             $cand = $candidatesById->get($techId);
 
             // Security: Strictly reject unknown technician IDs
-            if (!$cand) continue;
+            if (! $cand) {
+                continue;
+            }
 
             $rank = count($validRankings) + 1;
-            if ($rank > 3) break;
+            if ($rank > 3) {
+                break;
+            }
 
             $validRankings[] = [
                 'technician_id' => $cand['id'],
@@ -338,7 +339,7 @@ PROMPT;
             $technician = User::technicians()->lockForUpdate()->findOrFail($technicianId);
 
             if ($technician->status === 'inactive') {
-                throw new \InvalidArgumentException("Le technicien sélectionné est inactif et ne peut pas être affecté.");
+                throw new \InvalidArgumentException('Le technicien sélectionné est inactif et ne peut pas être affecté.');
             }
 
             $maintenance->technician_id = $technician->id;

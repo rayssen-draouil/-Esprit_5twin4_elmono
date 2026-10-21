@@ -26,7 +26,7 @@ class FinancementSubmitted extends Notification implements ShouldQueue
     {
         return new DatabaseMessage([
             'title' => 'Nouveau financement soumis pour validation',
-            'message' => "Le financement \"{$this->financement->source}\" ({$this->financement->amount} €) a été soumis pour approbation sur le projet \"{$this->financement->project->name}\"." . ($this->comment ? " Commentaire : {$this->comment}" : ''),
+            'message' => "Le financement \"{$this->financement->source}\" ({$this->financement->amount} €) a été soumis pour approbation sur le projet \"{$this->financement->project->name}\".".($this->comment ? " Commentaire : {$this->comment}" : ''),
             'type' => 'financement_submitted',
             'resource_type' => 'financement',
             'resource_id' => $this->financement->id,

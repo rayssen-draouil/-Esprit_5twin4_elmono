@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Back;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ZoneRequest;
 use App\Models\Zone;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -191,7 +192,7 @@ class ZoneController extends Controller
     /**
      * Requête de liste partagée par l'index et l'export CSV.
      *
-     * @return \Illuminate\Database\Eloquent\Builder<Zone>
+     * @return Builder<Zone>
      */
     private function filteredQuery(Request $request)
     {

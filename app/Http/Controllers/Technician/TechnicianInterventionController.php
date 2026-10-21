@@ -7,6 +7,7 @@ use App\Models\Equipement;
 use App\Models\Intervention;
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Services\EquipmentReservationService;
 use App\Services\MaintenanceLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +36,7 @@ class TechnicianInterventionController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user || !$user->isTechnician()) {
+        if (! $user || ! $user->isTechnician()) {
             return null;
         }
 
@@ -166,7 +167,7 @@ class TechnicianInterventionController extends Controller
                 ...($confirmed ? ['status' => 'in_progress', 'started_at' => now()] : []),
             ]);
             if ($confirmed) {
-                app(\App\Services\EquipmentReservationService::class)->syncStatus($selectedIds);
+                app(EquipmentReservationService::class)->syncStatus($selectedIds);
             }
         });
 
@@ -183,8 +184,8 @@ class TechnicianInterventionController extends Controller
         $technician = $this->getTechnician();
 
         // Enforce authorization: technician can only access their own assignments
-        if (!$technician || (int) $maintenance->technician_id !== (int) $technician->id) {
-            abort(403, "Accès interdit : Cette intervention ne vous est pas assignée.");
+        if (! $technician || (int) $maintenance->technician_id !== (int) $technician->id) {
+            abort(403, 'Accès interdit : Cette intervention ne vous est pas assignée.');
         }
 
         $maintenance->load(['infrastructure.zone', 'validator']);
@@ -199,7 +200,7 @@ class TechnicianInterventionController extends Controller
     {
         $technician = $this->getTechnician();
 
-        if (!$technician || (int) $maintenance->technician_id !== (int) $technician->id) {
+        if (! $technician || (int) $maintenance->technician_id !== (int) $technician->id) {
             abort(403, "Accès interdit : Vous n'êtes pas le technicien affecté à cette opération.");
         }
 
@@ -213,8 +214,8 @@ class TechnicianInterventionController extends Controller
             'duration_hours' => ['nullable', 'numeric', 'min:0.1', 'max:500'],
             'completed_at' => ['nullable', 'date', 'before_or_equal:now'],
         ], [
-            'result.required' => "Le compte-rendu technique des travaux réalisés est obligatoire.",
-            'result.min' => "Le compte-rendu doit comporter au moins 10 caractères explicatifs.",
+            'result.required' => 'Le compte-rendu technique des travaux réalisés est obligatoire.',
+            'result.min' => 'Le compte-rendu doit comporter au moins 10 caractères explicatifs.',
             'completed_at.before_or_equal' => "La date d'achèvement ne peut pas être dans le futur.",
         ]);
 
@@ -239,7 +240,7 @@ class TechnicianInterventionController extends Controller
     {
         $technician = $this->getTechnician();
 
-        if (!$technician || (int) $maintenance->technician_id !== (int) $technician->id) {
+        if (! $technician || (int) $maintenance->technician_id !== (int) $technician->id) {
             abort(403, "Accès interdit : Vous n'êtes pas le technicien affecté à cette opération.");
         }
 
@@ -247,10 +248,10 @@ class TechnicianInterventionController extends Controller
             'days' => ['required', 'integer', 'min:1', 'max:60'],
             'reason' => ['required', 'string', 'min:5', 'max:2000'],
         ], [
-            'days.required' => "Veuillez indiquer le nombre de jours supplémentaires.",
+            'days.required' => 'Veuillez indiquer le nombre de jours supplémentaires.',
             'days.min' => "La prolongation doit être d'au moins 1 jour.",
-            'reason.required' => "Veuillez expliquer la raison de ce report pour le gestionnaire.",
-            'reason.min' => "Le motif doit comporter au moins 5 caractères.",
+            'reason.required' => 'Veuillez expliquer la raison de ce report pour le gestionnaire.',
+            'reason.min' => 'Le motif doit comporter au moins 5 caractères.',
         ]);
 
         try {

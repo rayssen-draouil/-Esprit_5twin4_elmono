@@ -40,9 +40,7 @@ class TelegramBotService
         'annuler' => "Annuler l'action en cours",
     ];
 
-    public function __construct(private readonly TelegramApi $api)
-    {
-    }
+    public function __construct(private readonly TelegramApi $api) {}
 
     /**
      * Traite une mise à jour Telegram (message ou callback de bouton).
@@ -109,7 +107,7 @@ class TelegramBotService
     }
 
     /* ------------------------------------------------------------------ */
-    /* Commandes                                                           */
+    /* Commandes */
     /* ------------------------------------------------------------------ */
 
     private function commandStart(int|string $chatId, string $argument = ''): void
@@ -155,7 +153,7 @@ class TelegramBotService
 
         $this->send($chatId,
             "🧭 <b>Nouveau signalement</b> — étape 1/4\n\n".
-            "Quel type de problème souhaitez-vous signaler ?",
+            'Quel type de problème souhaitez-vous signaler ?',
             ['reply_markup' => ['inline_keyboard' => $rows]]
         );
     }
@@ -173,7 +171,7 @@ class TelegramBotService
             $this->send($chatId,
                 "🗂️ <b>Vos signalements</b>\n\n".
                 "Vous n'avez encore signalé aucun problème.\n\n".
-                "Créez-en un avec /signaler"
+                'Créez-en un avec /signaler'
             );
 
             return;
@@ -215,13 +213,13 @@ class TelegramBotService
             "🔎 <b>Vérification d'un dossier</b>\n\n".
             "Envoyez la référence du dossier, par exemple :\n".
             "• <code>SIG-0012</code> ou <code>12</code> (un de vos signalements)\n".
-            "• <code>INC-0003</code> (un incident rattaché à vos signalements)"
+            '• <code>INC-0003</code> (un incident rattaché à vos signalements)'
         );
     }
 
     private function commandAide(int|string $chatId): void
     {
-        $lines = ["🤖 <b>Commandes AquaSecure</b>", ''];
+        $lines = ['🤖 <b>Commandes AquaSecure</b>', ''];
 
         foreach (self::COMMANDS as $command => $description) {
             $lines[] = "<b>/{$command}</b> — {$description}";
@@ -234,7 +232,7 @@ class TelegramBotService
     }
 
     /* ------------------------------------------------------------------ */
-    /* Conversation : association du compte                                */
+    /* Conversation : association du compte */
     /* ------------------------------------------------------------------ */
 
     private function handleConversation(int|string $chatId, array $message, string $text): void
@@ -244,7 +242,7 @@ class TelegramBotService
         if (! is_array($state) || ! isset($state['step'])) {
             $this->send($chatId,
                 "🤖 Je n'ai pas compris ce message.\n\n".
-                "Tapez /aide pour voir les commandes disponibles."
+                'Tapez /aide pour voir les commandes disponibles.'
             );
 
             return;
@@ -309,11 +307,11 @@ class TelegramBotService
             "/signaler — Créer un nouveau signalement\n".
             "/mes_signalements — Consulter vos signalements\n".
             "/statut — Vérifier l'avancement d'un dossier\n".
-            "/aide — Afficher les commandes disponibles";
+            '/aide — Afficher les commandes disponibles';
     }
 
     /* ------------------------------------------------------------------ */
-    /* Conversation : /signaler                                            */
+    /* Conversation : /signaler */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -359,7 +357,7 @@ class TelegramBotService
         $this->send($chatId,
             "📍 <b>Nouveau signalement</b> — étape 3/4\n\n".
             "Indiquez la <b>localisation</b> du problème (adresse, commune, infrastructure…).\n".
-            "Vous pouvez aussi envoyer votre position 📎 depuis Telegram."
+            'Vous pouvez aussi envoyer votre position 📎 depuis Telegram.'
         );
     }
 
@@ -399,7 +397,7 @@ class TelegramBotService
 
         $this->send($chatId,
             "⚖️ <b>Nouveau signalement</b> — étape 4/4\n\n".
-            "Quelle est la <b>priorité</b> de ce problème ?",
+            'Quelle est la <b>priorité</b> de ce problème ?',
             ['reply_markup' => ['inline_keyboard' => $rows]]
         );
     }
@@ -432,12 +430,12 @@ class TelegramBotService
             "📌 Statut : {$this->signalementStatusLabel($signalement->status)}\n\n".
             "Nos équipes vont vérifier votre signalement.\n\n".
             "🔎 Suivez son avancement : /statut {$reference}\n".
-            "🗂️ Tous vos signalements : /mes_signalements"
+            '🗂️ Tous vos signalements : /mes_signalements'
         );
     }
 
     /* ------------------------------------------------------------------ */
-    /* Boutons (callback queries)                                          */
+    /* Boutons (callback queries) */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -488,7 +486,7 @@ class TelegramBotService
             "📝 <b>Nouveau signalement</b> — étape 2/4\n\n".
             "Type retenu : <b>{$this->esc($type)}</b>\n\n".
             "Décrivez le problème (où, quand, quoi…).\n".
-            "📎 Vous pouvez joindre une <b>photo</b> avec la description."
+            '📎 Vous pouvez joindre une <b>photo</b> avec la description.'
         );
     }
 
@@ -550,7 +548,7 @@ class TelegramBotService
     }
 
     /* ------------------------------------------------------------------ */
-    /* Conversation : /statut                                              */
+    /* Conversation : /statut */
     /* ------------------------------------------------------------------ */
 
     private function stepStatutRef(int|string $chatId, string $text): void
@@ -586,7 +584,7 @@ class TelegramBotService
 
         $this->send($chatId,
             "❌ Référence <b>{$this->esc($reference)}</b> non reconnue.\n\n".
-            "Formats acceptés : <code>SIG-0012</code>, <code>12</code> ou <code>INC-0003</code>."
+            'Formats acceptés : <code>SIG-0012</code>, <code>12</code> ou <code>INC-0003</code>.'
         );
     }
 
@@ -596,7 +594,7 @@ class TelegramBotService
 
         if (! $signalement) {
             $this->send($chatId,
-                "❌ Aucun signalement <b>SIG-".str_pad((string) $signalementId, 4, '0', STR_PAD_LEFT)."</b> ".
+                '❌ Aucun signalement <b>SIG-'.str_pad((string) $signalementId, 4, '0', STR_PAD_LEFT).'</b> '.
                 "n'existe pour votre compte.\n\nConsultez /mes_signalements"
             );
 
@@ -634,7 +632,7 @@ class TelegramBotService
 
         if (! $incident) {
             $this->send($chatId,
-                "❌ Aucun incident <b>INC-".str_pad((string) $incidentId, 4, '0', STR_PAD_LEFT)."</b> ".
+                '❌ Aucun incident <b>INC-'.str_pad((string) $incidentId, 4, '0', STR_PAD_LEFT).'</b> '.
                 "n'est rattaché à vos signalements.\n\nConsultez /mes_signalements"
             );
 
@@ -662,7 +660,7 @@ class TelegramBotService
     }
 
     /* ------------------------------------------------------------------ */
-    /* Utilitaires                                                          */
+    /* Utilitaires */
     /* ------------------------------------------------------------------ */
 
     private function linkedUser(int|string $chatId): ?User

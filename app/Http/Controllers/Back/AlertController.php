@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AlertRequest;
 use App\Models\Alert;
 use App\Models\Zone;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -186,8 +189,8 @@ class AlertController extends Controller
         return response()->json([
             'success' => true,
             'kpi' => $this->kpis(),
-            'latest_at' => $latest ? \Illuminate\Support\Carbon::parse($latest)->toIso8601String() : null,
-            'latest_critical_at' => $latestCritical ? \Illuminate\Support\Carbon::parse($latestCritical)->toIso8601String() : null,
+            'latest_at' => $latest ? Carbon::parse($latest)->toIso8601String() : null,
+            'latest_critical_at' => $latestCritical ? Carbon::parse($latestCritical)->toIso8601String() : null,
             'new_count' => $newCount,
             'new_critical_count' => $newCriticalCount,
         ]);
@@ -227,7 +230,7 @@ class AlertController extends Controller
         ]);
     }
 
-    /** @return array{zones: \Illuminate\Support\Collection} */
+    /** @return array{zones: Collection} */
     private function formData(): array
     {
         return ['zones' => Zone::orderBy('name')->get(['id', 'name'])];
@@ -248,7 +251,7 @@ class AlertController extends Controller
     /**
      * Requête de liste partagée par l'index et l'export CSV.
      *
-     * @return \Illuminate\Database\Eloquent\Builder<Alert>
+     * @return Builder<Alert>
      */
     private function filteredQuery(Request $request)
     {
@@ -264,7 +267,7 @@ class AlertController extends Controller
             ->orderBy(...$this->sort($request));
     }
 
-    /** @param \Illuminate\Database\Eloquent\Builder<Alert> $query */
+    /** @param Builder<Alert> $query */
     private function applyStatus($query, string $status): void
     {
         match ($status) {
@@ -277,7 +280,7 @@ class AlertController extends Controller
         };
     }
 
-    /** @param \Illuminate\Database\Eloquent\Builder<Alert> $query */
+    /** @param Builder<Alert> $query */
     private function applyPeriod($query, Request $request): void
     {
         match ($request->string('period')->toString()) {
@@ -285,8 +288,8 @@ class AlertController extends Controller
             '7d' => $query->where('created_at', '>=', now()->subDays(7)),
             '30d' => $query->where('created_at', '>=', now()->subDays(30)),
             'custom' => $query
-                ->when($request->date('from'), fn ($q, $from) => $q->where('created_at', '>=', \Illuminate\Support\Carbon::parse($from)->startOfDay()))
-                ->when($request->date('to'), fn ($q, $to) => $q->where('created_at', '<=', \Illuminate\Support\Carbon::parse($to)->endOfDay())),
+                ->when($request->date('from'), fn ($q, $from) => $q->where('created_at', '>=', Carbon::parse($from)->startOfDay()))
+                ->when($request->date('to'), fn ($q, $to) => $q->where('created_at', '<=', Carbon::parse($to)->endOfDay())),
             default => null,
         };
     }
@@ -304,11 +307,11 @@ class AlertController extends Controller
         return match ($column) {
             'oldest' => ['created_at', 'asc'],
             'severity' => [
-                \Illuminate\Support\Facades\DB::raw("CASE severity WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END"), $direction,
+                DB::raw("CASE severity WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END"), $direction,
             ],
             'age' => ['created_at', 'asc'],
             'priority' => [
-                \Illuminate\Support\Facades\DB::raw("CASE severity WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END"), 'desc',
+                DB::raw("CASE severity WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END"), 'desc',
             ],
             default => ['created_at', 'desc'],
         };
@@ -352,7 +355,7 @@ class AlertController extends Controller
     /**
      * Étapes du cycle de vie de l'alerte pour la timeline.
      *
-     * @return Collection<int, array{label: string, at: \Illuminate\Support\Carbon|null, done: bool}>
+     * @return Collection<int, array{label: string, at: Carbon|null, done: bool}>
      */
     private function timeline(Alert $alert): Collection
     {

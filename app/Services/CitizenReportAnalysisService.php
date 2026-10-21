@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Exceptions\GroqAiException;
 use App\Models\Signalement;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -16,10 +15,6 @@ class CitizenReportAnalysisService
 
     /**
      * Analyze a citizen signalement report using AI and hybrid duplicate detection.
-     *
-     * @param Signalement|int $signalement
-     * @param bool $persist
-     * @return array
      */
     public function analyze(Signalement|int $signalement, bool $persist = true): array
     {
@@ -75,10 +70,10 @@ class CitizenReportAnalysisService
         return Signalement::where('id', '!=', $report->id)
             ->where('reported_at', '>=', $since)
             ->where(function ($q) use ($report) {
-                if (!empty($report->location)) {
-                    $q->where('location', 'like', '%' . substr($report->location, 0, 15) . '%');
+                if (! empty($report->location)) {
+                    $q->where('location', 'like', '%'.substr($report->location, 0, 15).'%');
                 }
-                if (!empty($report->type)) {
+                if (! empty($report->type)) {
                     $q->orWhere('type', $report->type);
                 }
             })
@@ -92,7 +87,7 @@ class CitizenReportAnalysisService
      */
     protected function callGroqReportAnalysis(Signalement $report, Collection $candidates): array
     {
-        $systemPrompt = <<<PROMPT
+        $systemPrompt = <<<'PROMPT'
 Vous êtes le classificateur d'incidents et de signalements citoyens pour la régie d'eau AquaSecure.
 Votre mission est d'analyser le signalement rédigé par un usager, d'en extraire la typologie technique, la gravité et de détecter d'éventuels signalements doublons.
 
@@ -123,19 +118,19 @@ PROMPT;
         ];
 
         $userPrompt = "Analysez ce signalement citoyen et évaluez les doublons potentiels :\n\n"
-            . json_encode($userContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-            . "\n\nProduisez un JSON structuré contenant exactement :\n"
-            . "- report_id : {$report->id}\n"
-            . "- suggested_category : 'fuite' | 'coupure' | 'contamination' | 'panne' | 'pression' | 'qualite' | 'degat' | 'autre'\n"
-            . "- suggested_severity : 'low' | 'medium' | 'high' | 'critical'\n"
-            . "- suggested_priority : 'low' | 'medium' | 'high' | 'critical'\n"
-            . "- summary : Synthèse technique concise du dysfonctionnement\n"
-            . "- location_details : Précisions topographiques ou de repère extraites\n"
-            . "- recommended_next_action : Prochaine étape recommandée pour le gestionnaire\n"
-            . "- possible_duplicate_reports : Tableau d'IDs des signalements doublons probables (ex: [12, 15])\n"
-            . "- duplicate_reason : Explication du lien ou mention 'Aucun doublon détecté'\n"
-            . "- uncertainties : Incertitudes ou éléments ambigus dans la déclaration citoyenne\n"
-            . "- requires_human_review : true ou false\n";
+            .json_encode($userContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            ."\n\nProduisez un JSON structuré contenant exactement :\n"
+            ."- report_id : {$report->id}\n"
+            ."- suggested_category : 'fuite' | 'coupure' | 'contamination' | 'panne' | 'pression' | 'qualite' | 'degat' | 'autre'\n"
+            ."- suggested_severity : 'low' | 'medium' | 'high' | 'critical'\n"
+            ."- suggested_priority : 'low' | 'medium' | 'high' | 'critical'\n"
+            ."- summary : Synthèse technique concise du dysfonctionnement\n"
+            ."- location_details : Précisions topographiques ou de repère extraites\n"
+            ."- recommended_next_action : Prochaine étape recommandée pour le gestionnaire\n"
+            ."- possible_duplicate_reports : Tableau d'IDs des signalements doublons probables (ex: [12, 15])\n"
+            ."- duplicate_reason : Explication du lien ou mention 'Aucun doublon détecté'\n"
+            ."- uncertainties : Incertitudes ou éléments ambigus dans la déclaration citoyenne\n"
+            ."- requires_human_review : true ou false\n";
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -152,18 +147,18 @@ PROMPT;
     {
         $allowedCategories = ['fuite', 'coupure', 'contamination', 'panne', 'pression', 'qualite', 'degat', 'autre'];
         $category = strtolower((string) ($raw['suggested_category'] ?? 'autre'));
-        if (!in_array($category, $allowedCategories, true)) {
+        if (! in_array($category, $allowedCategories, true)) {
             $category = $this->guessCategoryFromText($report->description);
         }
 
         $allowedLevels = ['low', 'medium', 'high', 'critical'];
         $severity = strtolower((string) ($raw['suggested_severity'] ?? 'medium'));
-        if (!in_array($severity, $allowedLevels, true)) {
+        if (! in_array($severity, $allowedLevels, true)) {
             $severity = 'medium';
         }
 
         $priority = strtolower((string) ($raw['suggested_priority'] ?? $severity));
-        if (!in_array($priority, $allowedLevels, true)) {
+        if (! in_array($priority, $allowedLevels, true)) {
             $priority = $severity;
         }
 
@@ -173,8 +168,8 @@ PROMPT;
         $validDuplicates = array_values(array_intersect($rawDuplicates, $candidateIds));
 
         $dupReason = (string) ($raw['duplicate_reason'] ?? '');
-        if (!empty($validDuplicates)) {
-            $dupReason = "Possible doublon — revue requise : " . ($dupReason ?: "Similitude de localisation et de description avec le(s) signalement(s) #" . implode(', #', $validDuplicates));
+        if (! empty($validDuplicates)) {
+            $dupReason = 'Possible doublon — revue requise : '.($dupReason ?: 'Similitude de localisation et de description avec le(s) signalement(s) #'.implode(', #', $validDuplicates));
         } else {
             $dupReason = 'Aucun signalement doublon identifié parmi les signalements récents.';
         }
@@ -204,19 +199,19 @@ PROMPT;
     {
         $category = $this->guessCategoryFromText($report->description);
         $severity = strtolower((string) ($report->priority ?? 'medium'));
-        if (!in_array($severity, ['low', 'medium', 'high', 'critical'], true)) {
+        if (! in_array($severity, ['low', 'medium', 'high', 'critical'], true)) {
             $severity = 'medium';
         }
 
         // Check duplicates by exact location or matching type
         $matching = $candidates->filter(function ($c) use ($report) {
-            return !empty($report->location) && strtolower($c->location) === strtolower($report->location);
+            return ! empty($report->location) && strtolower($c->location) === strtolower($report->location);
         });
 
         $dupIds = $matching->pluck('id')->toArray();
-        $dupReason = !empty($dupIds)
-            ? "Possible doublon — revue requise : Même localisation déclarée que le(s) signalement(s) #" . implode(', #', $dupIds)
-            : "Aucun doublon évident détecté dans le secteur.";
+        $dupReason = ! empty($dupIds)
+            ? 'Possible doublon — revue requise : Même localisation déclarée que le(s) signalement(s) #'.implode(', #', $dupIds)
+            : 'Aucun doublon évident détecté dans le secteur.';
 
         return [
             'report_id' => $report->id,
@@ -224,7 +219,7 @@ PROMPT;
             'suggested_category_label' => ucfirst($category),
             'suggested_severity' => $severity,
             'suggested_priority' => $severity,
-            'summary' => "Signalement citoyen enregistré : " . substr((string) $report->description, 0, 140),
+            'summary' => 'Signalement citoyen enregistré : '.substr((string) $report->description, 0, 140),
             'location_details' => $report->location ?: 'Non renseigné',
             'recommended_next_action' => 'Contrôler le signalement et décider de l\'ouverture d\'un incident.',
             'possible_duplicate_reports' => $dupIds,
@@ -254,6 +249,7 @@ PROMPT;
         if (str_contains($lower, 'pompe') || str_contains($lower, 'moteur') || str_contains($lower, 'panne')) {
             return 'panne';
         }
+
         return 'autre';
     }
 }

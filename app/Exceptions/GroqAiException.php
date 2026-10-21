@@ -7,6 +7,7 @@ use Exception;
 class GroqAiException extends Exception
 {
     protected ?int $statusCode;
+
     protected ?string $userFriendlyMessage;
 
     public function __construct(string $message, int $statusCode = 500, ?string $userFriendlyMessage = null, ?Exception $previous = null)

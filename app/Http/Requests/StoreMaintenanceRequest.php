@@ -63,7 +63,7 @@ class StoreMaintenanceRequest extends FormRequest
             if ($startedAt && $completedAt && strtotime($completedAt) < strtotime($startedAt)) {
                 $v->errors()->add(
                     'completed_at',
-                    'La date d’achèvement des travaux doit être égale ou postérieure à la date de début sur site (' . date('d/m/Y H:i', strtotime($startedAt)) . ').'
+                    'La date d’achèvement des travaux doit être égale ou postérieure à la date de début sur site ('.date('d/m/Y H:i', strtotime($startedAt)).').'
                 );
             }
 

@@ -3,11 +3,6 @@
 namespace App\Services;
 
 use App\Models\Project;
-use App\Models\ProjectBudgetRevision;
-use App\Models\ProjectExpense;
-use App\Models\ExpensePayment;
-use App\Models\Financement;
-use Illuminate\Support\Facades\DB;
 
 class ProjectFinancialService
 {
@@ -48,7 +43,7 @@ class ProjectFinancialService
     /**
      * Get the budget variance percentage
      */
-    public static function getBudgetVariancePercentage(Project $project): float|null
+    public static function getBudgetVariancePercentage(Project $project): ?float
     {
         $initial = self::getInitialBudget($project);
         if ($initial <= 0) {
@@ -110,7 +105,7 @@ class ProjectFinancialService
     /**
      * Get financial coverage rate (funding / budget * 100)
      */
-    public static function getFinancialCoverageRate(Project $project): float|null
+    public static function getFinancialCoverageRate(Project $project): ?float
     {
         $budget = self::getRevisedBudget($project);
         if ($budget <= 0) {
@@ -123,7 +118,7 @@ class ProjectFinancialService
     /**
      * Get budget consumption rate (engaged / budget * 100)
      */
-    public static function getBudgetConsumptionRate(Project $project): float|null
+    public static function getBudgetConsumptionRate(Project $project): ?float
     {
         $budget = self::getRevisedBudget($project);
         if ($budget <= 0) {
@@ -136,7 +131,7 @@ class ProjectFinancialService
     /**
      * Get payment rate (paid / engaged * 100)
      */
-    public static function getPaymentRate(Project $project): float|null
+    public static function getPaymentRate(Project $project): ?float
     {
         $engaged = self::getEngagedExpenses($project);
         if ($engaged <= 0) {

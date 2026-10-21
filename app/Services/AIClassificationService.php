@@ -16,9 +16,6 @@ class AIClassificationService
 
     /**
      * Classifie une description de signalement via l'API Flask
-     *
-     * @param string $description
-     * @return array
      */
     public function classify(string $description): array
     {
@@ -52,13 +49,12 @@ class AIClassificationService
 
     /**
      * Vérifie si le service de classification est disponible
-     *
-     * @return bool
      */
     public function isAvailable(): bool
     {
         try {
             $response = Http::timeout(2)->get("{$this->apiUrl}/health");
+
             return $response->successful() && $response->json('model_loaded', false);
         } catch (\Exception $e) {
             return false;
@@ -67,9 +63,6 @@ class AIClassificationService
 
     /**
      * Mappe les catégories de l'IA vers les types du système
-     *
-     * @param string $aiCategory
-     * @return string
      */
     public function mapCategoryToType(string $aiCategory): string
     {

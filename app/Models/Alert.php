@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Observers\AlertObserver;
+use App\Support\CitizenStatus;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -161,10 +162,10 @@ class Alert extends Model
             'critical' => "Une situation critique a été détectée sur cette zone. Par précaution, ne consommez pas l'eau du robinet et suivez les consignes officielles.",
             'high' => "Une anomalie importante a été détectée. Limitez l'usage de l'eau du robinet le temps que nos équipes vérifient la situation.",
             'medium' => "Une anomalie a été détectée et nos équipes la surveillent. Aucune restriction particulière n'est en vigueur pour le moment.",
-            'low' => "Une vérification de routine a été déclenchée. La situation est suivie par nos équipes.",
-            'warning' => "Une anomalie a été détectée. Nos équipes vérifient la situation.",
-            'info' => "Une information de suivi a été publiée pour cette zone.",
-            default => "Nos équipes suivent la situation sur cette zone.",
+            'low' => 'Une vérification de routine a été déclenchée. La situation est suivie par nos équipes.',
+            'warning' => 'Une anomalie a été détectée. Nos équipes vérifient la situation.',
+            'info' => 'Une information de suivi a été publiée pour cette zone.',
+            default => 'Nos équipes suivent la situation sur cette zone.',
         };
     }
 
@@ -201,6 +202,6 @@ class Alert extends Model
     /** Frise de traitement publique. */
     public function publicTimeline(): array
     {
-        return \App\Support\CitizenStatus::alertTimeline($this);
+        return CitizenStatus::alertTimeline($this);
     }
 }

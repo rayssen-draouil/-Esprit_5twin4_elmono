@@ -7,13 +7,14 @@ use Exception;
 class ProjectDoctorException extends Exception
 {
     protected ?int $statusCode;
+
     protected ?string $userFriendlyMessage;
 
     public function __construct(string $message, int $statusCode = 500, ?string $userFriendlyMessage = null, ?Exception $previous = null)
     {
         parent::__construct($message, $statusCode, $previous);
         $this->statusCode = $statusCode;
-        $this->userFriendlyMessage = $userFriendlyMessage ?? "Le service Project Doctor est temporairement indisponible. Veuillez réessayer ultérieurement.";
+        $this->userFriendlyMessage = $userFriendlyMessage ?? 'Le service Project Doctor est temporairement indisponible. Veuillez réessayer ultérieurement.';
     }
 
     public function getUserFriendlyMessage(): string

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Exceptions\GroqAiException;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\MaintenanceIntelligenceScan;
@@ -20,7 +19,7 @@ class MaintenanceRiskAnalysisService
     /**
      * Execute a full deterministic assessment and AI risk analysis.
      *
-     * @param bool $persist Whether to save the scan in the database
+     * @param  bool  $persist  Whether to save the scan in the database
      * @return array Standardized result containing metrics and findings
      */
     public function executeScan(bool $persist = true): array
@@ -69,6 +68,7 @@ class MaintenanceRiskAnalysisService
         usort($findings, function ($a, $b) use ($priorityOrder) {
             $pA = $priorityOrder[$a['risk_level']] ?? 5;
             $pB = $priorityOrder[$b['risk_level']] ?? 5;
+
             return $pA <=> $pB;
         });
 
@@ -139,7 +139,7 @@ class MaintenanceRiskAnalysisService
 
             // 1. Check overdue maintenances
             $overdueMaintenances = $infra->maintenances->filter(function (Maintenance $m) {
-                return $m->scheduled_at && $m->scheduled_at->isPast() && !in_array($m->status, ['completed', 'cancelled'], true);
+                return $m->scheduled_at && $m->scheduled_at->isPast() && ! in_array($m->status, ['completed', 'cancelled'], true);
             });
 
             if ($overdueMaintenances->isNotEmpty()) {
@@ -156,14 +156,14 @@ class MaintenanceRiskAnalysisService
             if ($infra->next_maintenance_date) {
                 if ($infra->next_maintenance_date->isPast()) {
                     $reasons[] = "Date d'échéance de maintenance dépassée";
-                    $facts[] = "Échéance recommandée fixée au " . $infra->next_maintenance_date->format('d/m/Y') . " (dépassée).";
+                    $facts[] = 'Échéance recommandée fixée au '.$infra->next_maintenance_date->format('d/m/Y').' (dépassée).';
                 } elseif ($infra->next_maintenance_date->lte(now()->addDays(14))) {
                     $totalDueSoon++;
-                    $reasons[] = "Échéance de maintenance imminente (sous 14 jours)";
-                    $facts[] = "Prochaine échéance prévue le " . $infra->next_maintenance_date->format('d/m/Y') . ".";
+                    $reasons[] = 'Échéance de maintenance imminente (sous 14 jours)';
+                    $facts[] = 'Prochaine échéance prévue le '.$infra->next_maintenance_date->format('d/m/Y').'.';
                 }
             } else {
-                $missingData[] = "Aucune prochaine date de maintenance programmée.";
+                $missingData[] = 'Aucune prochaine date de maintenance programmée.';
             }
 
             // 3. Operational status
@@ -172,7 +172,7 @@ class MaintenanceRiskAnalysisService
                 $reasons[] = "Statut opérationnel critique ou hors service ({$infra->status_label})";
                 $facts[] = "Infrastructure actuellement au statut : {$infra->status_label}.";
             } elseif ($infra->status === 'maintenance') {
-                $facts[] = "Infrastructure actuellement en cours de maintenance.";
+                $facts[] = 'Infrastructure actuellement en cours de maintenance.';
             }
 
             // 4. Physical condition
@@ -188,13 +188,13 @@ class MaintenanceRiskAnalysisService
                 $openIncidentsCount += $openIncidents->count();
                 $reasons[] = "{$openIncidents->count()} incident(s) actif(s) non résolu(s)";
                 foreach ($openIncidents as $inc) {
-                    $facts[] = "Incident {$inc->type} (gravité: {$inc->severity}) signalé le " . ($inc->reported_at ? $inc->reported_at->format('d/m/Y H:i') : 'N/A') . " : " . substr((string) $inc->description, 0, 120);
+                    $facts[] = "Incident {$inc->type} (gravité: {$inc->severity}) signalé le ".($inc->reported_at ? $inc->reported_at->format('d/m/Y H:i') : 'N/A').' : '.substr((string) $inc->description, 0, 120);
                 }
             }
 
             // 6. Data quality checks
-            if (!$infra->last_maintenance_date) {
-                $missingData[] = "Historique de dernière maintenance non renseigné.";
+            if (! $infra->last_maintenance_date) {
+                $missingData[] = 'Historique de dernière maintenance non renseigné.';
             }
             $completedWithoutResult = $infra->maintenances->where('status', 'completed')->filter(fn ($m) => empty($m->result));
             if ($completedWithoutResult->isNotEmpty()) {
@@ -203,26 +203,42 @@ class MaintenanceRiskAnalysisService
 
             // Rule-based preliminary urgency scoring
             $score = 0;
-            if ($infra->criticality === 'vital') $score += 35;
-            elseif ($infra->criticality === 'high') $score += 20;
+            if ($infra->criticality === 'vital') {
+                $score += 35;
+            } elseif ($infra->criticality === 'high') {
+                $score += 20;
+            }
 
-            if ($infra->status === 'critical' || $infra->status === 'offline') $score += 40;
-            if ($infra->condition === 'critical') $score += 40;
-            elseif ($infra->condition === 'poor') $score += 25;
+            if ($infra->status === 'critical' || $infra->status === 'offline') {
+                $score += 40;
+            }
+            if ($infra->condition === 'critical') {
+                $score += 40;
+            } elseif ($infra->condition === 'poor') {
+                $score += 25;
+            }
 
-            if ($overdueMaintenances->isNotEmpty()) $score += 30;
-            if ($openIncidents->whereIn('severity', ['critical', 'high'])->isNotEmpty()) $score += 35;
+            if ($overdueMaintenances->isNotEmpty()) {
+                $score += 30;
+            }
+            if ($openIncidents->whereIn('severity', ['critical', 'high'])->isNotEmpty()) {
+                $score += 35;
+            }
 
             $preliminaryUrgency = 'low';
-            if ($score >= 70) $preliminaryUrgency = 'critical';
-            elseif ($score >= 45) $preliminaryUrgency = 'high';
-            elseif ($score >= 25 || !empty($reasons)) $preliminaryUrgency = 'medium';
+            if ($score >= 70) {
+                $preliminaryUrgency = 'critical';
+            } elseif ($score >= 45) {
+                $preliminaryUrgency = 'high';
+            } elseif ($score >= 25 || ! empty($reasons)) {
+                $preliminaryUrgency = 'medium';
+            }
 
             // Only consider as a risk candidate if there is at least one active issue or data quality gap on high-criticality assets
-            if (!empty($reasons) || ($infra->criticality === 'vital' && !empty($missingData))) {
+            if (! empty($reasons) || ($infra->criticality === 'vital' && ! empty($missingData))) {
                 $candidates->push([
                     'infrastructure_id' => $infra->id,
-                    'reference_code' => $infra->reference_code ?? ('INF-' . $infra->id),
+                    'reference_code' => $infra->reference_code ?? ('INF-'.$infra->id),
                     'name' => $infra->name,
                     'type' => $infra->type,
                     'zone' => $infra->zone?->name ?? 'Zone non assignée',
@@ -303,7 +319,7 @@ class MaintenanceRiskAnalysisService
         }
 
         $formula = sprintf(
-            "Indicateur global (%d/100) : pondération basée sur les équipements hors service ou dégradés (%d%%), les maintenances en retard (%d cas) et les incidents non résolus (%d cas).",
+            'Indicateur global (%d/100) : pondération basée sur les équipements hors service ou dégradés (%d%%), les maintenances en retard (%d cas) et les incidents non résolus (%d cas).',
             $totalScore,
             (int) round($degradedRatio * 100),
             $dbMetrics['overdue_maintenances_count'],
@@ -333,7 +349,7 @@ class MaintenanceRiskAnalysisService
             };
         })->values()->take(15);
 
-        $systemPrompt = <<<PROMPT
+        $systemPrompt = <<<'PROMPT'
 Vous êtes l'analyste d'ingénierie et de maintenance industrielle pour la plateforme de gestion hydraulique AquaSecure.
 Votre rôle est d'analyser des données de maintenance et d'infrastructure réelles fournies en entrée, d'évaluer les risques techniques, de prioriser les interventions et d'expliquer les urgences.
 
@@ -346,24 +362,24 @@ DIRECTIVES DE SÉCURITÉ ET DE RIGUEUR STRICTES :
 PROMPT;
 
         $userPrompt = "Voici les faits vérifiés issus de la base de données pour les infrastructures présentant des anomalies ou des besoins de maintenance :\n\n"
-            . json_encode([
+            .json_encode([
                 'context_metrics' => $dbMetrics,
                 'infrastructures_at_risk' => $sortedCandidates->toArray(),
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-            . "\n\nAnalysez chaque infrastructure et produisez un tableau 'findings' contenant pour chacune :\n"
-            . "- title : Titre concis du risque détecté\n"
-            . "- infrastructure_id : ID numérique exact de l'infrastructure analysée\n"
-            . "- risk_level : 'critical' | 'high' | 'medium' | 'low'\n"
-            . "- confidence : 'high' | 'medium' | 'low' (évaluation de la complétude des preuves fournies)\n"
-            . "- summary : Synthèse explicative du problème réel\n"
-            . "- evidence : Liste des faits objectifs précis tirés des données\n"
-            . "- risk_factors : Facteurs augmentant l'urgence technique\n"
-            . "- consequences : Conséquences opérationnelles plausibles si non traité\n"
-            . "- recommended_actions : Actions concrètes ordonnées par urgence\n"
-            . "- recommended_maintenance_type : 'Préventive' | 'Corrective' | 'Inspection' | 'Réglementaire' | 'Urgence'\n"
-            . "- recommended_timeframe : Fenêtre de traitement préconisée (ex: 'Immédiat (24h)', 'Sous 7 jours', 'Sous 30 jours')\n"
-            . "- missing_information : Données manquantes identifiées dans le dossier\n"
-            . "- planning_recommended : Booléen (true/false) indiquant si une opération de maintenance doit être planifiée\n";
+            ."\n\nAnalysez chaque infrastructure et produisez un tableau 'findings' contenant pour chacune :\n"
+            ."- title : Titre concis du risque détecté\n"
+            ."- infrastructure_id : ID numérique exact de l'infrastructure analysée\n"
+            ."- risk_level : 'critical' | 'high' | 'medium' | 'low'\n"
+            ."- confidence : 'high' | 'medium' | 'low' (évaluation de la complétude des preuves fournies)\n"
+            ."- summary : Synthèse explicative du problème réel\n"
+            ."- evidence : Liste des faits objectifs précis tirés des données\n"
+            ."- risk_factors : Facteurs augmentant l'urgence technique\n"
+            ."- consequences : Conséquences opérationnelles plausibles si non traité\n"
+            ."- recommended_actions : Actions concrètes ordonnées par urgence\n"
+            ."- recommended_maintenance_type : 'Préventive' | 'Corrective' | 'Inspection' | 'Réglementaire' | 'Urgence'\n"
+            ."- recommended_timeframe : Fenêtre de traitement préconisée (ex: 'Immédiat (24h)', 'Sous 7 jours', 'Sous 30 jours')\n"
+            ."- missing_information : Données manquantes identifiées dans le dossier\n"
+            ."- planning_recommended : Booléen (true/false) indiquant si une opération de maintenance doit être planifiée\n";
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -379,7 +395,7 @@ PROMPT;
     protected function normalizeAndValidateAiFindings(array $aiResponse, Collection $candidates, Collection $infrastructures): array
     {
         $rawFindings = $aiResponse['findings'] ?? $aiResponse;
-        if (!is_array($rawFindings)) {
+        if (! is_array($rawFindings)) {
             return $this->generateDeterministicFindings($candidates, $infrastructures);
         }
 
@@ -388,30 +404,32 @@ PROMPT;
         $validFindings = [];
 
         foreach ($rawFindings as $f) {
-            if (!is_array($f)) continue;
+            if (! is_array($f)) {
+                continue;
+            }
 
             $infraId = (int) ($f['infrastructure_id'] ?? 0);
             $infra = $infrasById->get($infraId);
             $candidate = $candidatesById->get($infraId);
 
             // Never trust model-generated IDs that don't match our real scanned candidates
-            if (!$infra || !$candidate) {
+            if (! $infra || ! $candidate) {
                 continue;
             }
 
             $riskLevel = strtolower((string) ($f['risk_level'] ?? 'medium'));
-            if (!in_array($riskLevel, ['critical', 'high', 'medium', 'low'], true)) {
+            if (! in_array($riskLevel, ['critical', 'high', 'medium', 'low'], true)) {
                 $riskLevel = $candidate['preliminary_urgency'];
             }
 
             $confidence = strtolower((string) ($f['confidence'] ?? 'medium'));
-            if (!in_array($confidence, ['high', 'medium', 'low'], true)) {
+            if (! in_array($confidence, ['high', 'medium', 'low'], true)) {
                 $confidence = empty($candidate['missing_data']) ? 'high' : 'medium';
             }
 
             $maintType = (string) ($f['recommended_maintenance_type'] ?? 'Préventive');
             $allowedTypes = ['Préventive', 'Corrective', 'Inspection', 'Réglementaire', 'Urgence'];
-            if (!in_array($maintType, $allowedTypes, true)) {
+            if (! in_array($maintType, $allowedTypes, true)) {
                 $maintType = ($riskLevel === 'critical') ? 'Urgence' : 'Corrective';
             }
 
@@ -419,7 +437,7 @@ PROMPT;
                 'title' => (string) ($f['title'] ?? "Alerte de maintenance - {$infra->name}"),
                 'infrastructure_id' => $infra->id,
                 'infrastructure_name' => $infra->name,
-                'reference_code' => $infra->reference_code ?? ('INF-' . $infra->id),
+                'reference_code' => $infra->reference_code ?? ('INF-'.$infra->id),
                 'zone_name' => $infra->zone?->name ?? 'Zone non assignée',
                 'infrastructure_type' => $infra->type,
                 'operational_status' => $infra->status,
@@ -435,7 +453,7 @@ PROMPT;
                 'risk_level' => $riskLevel,
                 'confidence' => $confidence,
                 'summary' => (string) ($f['summary'] ?? implode('. ', $candidate['detected_reasons'])),
-                'evidence' => is_array($f['evidence'] ?? null) && !empty($f['evidence'])
+                'evidence' => is_array($f['evidence'] ?? null) && ! empty($f['evidence'])
                     ? array_map('strval', $f['evidence'])
                     : $candidate['verified_facts'],
                 'risk_factors' => is_array($f['risk_factors'] ?? null) ? array_map('strval', $f['risk_factors']) : $candidate['detected_reasons'],
@@ -443,7 +461,7 @@ PROMPT;
                 'recommended_actions' => is_array($f['recommended_actions'] ?? null) ? array_map('strval', $f['recommended_actions']) : ['Effectuer une visite d\'inspection technique prioritaire.'],
                 'recommended_maintenance_type' => $maintType,
                 'recommended_timeframe' => (string) ($f['recommended_timeframe'] ?? ($riskLevel === 'critical' ? 'Sous 24-48 heures' : 'Sous 7 jours')),
-                'missing_information' => is_array($f['missing_information'] ?? null) && !empty($f['missing_information'])
+                'missing_information' => is_array($f['missing_information'] ?? null) && ! empty($f['missing_information'])
                     ? array_map('strval', $f['missing_information'])
                     : $candidate['missing_data'],
                 'planning_recommended' => (bool) ($f['planning_recommended'] ?? true),
@@ -469,7 +487,9 @@ PROMPT;
 
         foreach ($candidates as $c) {
             $infra = $infrasById->get($c['infrastructure_id']);
-            if (!$infra) continue;
+            if (! $infra) {
+                continue;
+            }
 
             $riskLevel = $c['preliminary_urgency'];
             $maintType = match ($riskLevel) {
@@ -487,10 +507,10 @@ PROMPT;
             };
 
             $findings[] = [
-                'title' => "Risque identifié : {$infra->name} (" . implode(', ', array_slice($c['detected_reasons'], 0, 2)) . ")",
+                'title' => "Risque identifié : {$infra->name} (".implode(', ', array_slice($c['detected_reasons'], 0, 2)).')',
                 'infrastructure_id' => $infra->id,
                 'infrastructure_name' => $infra->name,
-                'reference_code' => $infra->reference_code ?? ('INF-' . $infra->id),
+                'reference_code' => $infra->reference_code ?? ('INF-'.$infra->id),
                 'zone_name' => $infra->zone?->name ?? 'Zone non assignée',
                 'infrastructure_type' => $infra->type,
                 'operational_status' => $infra->status,
@@ -505,7 +525,7 @@ PROMPT;
                 'overdue_count' => $c['overdue_count'],
                 'risk_level' => $riskLevel,
                 'confidence' => empty($c['missing_data']) ? 'high' : 'medium',
-                'summary' => "Analyse déterministe basée sur les faits réels : " . implode('. ', $c['detected_reasons']),
+                'summary' => 'Analyse déterministe basée sur les faits réels : '.implode('. ', $c['detected_reasons']),
                 'evidence' => $c['verified_facts'],
                 'risk_factors' => $c['detected_reasons'],
                 'consequences' => [
@@ -514,7 +534,7 @@ PROMPT;
                 ],
                 'recommended_actions' => [
                     "Déclencher une opération de maintenance de type « {$maintType} »",
-                    "Vérifier sur site les paramètres de fonctionnement et consigner le rapport technique",
+                    'Vérifier sur site les paramètres de fonctionnement et consigner le rapport technique',
                 ],
                 'recommended_maintenance_type' => $maintType,
                 'recommended_timeframe' => $timeframe,

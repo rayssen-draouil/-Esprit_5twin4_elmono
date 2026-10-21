@@ -53,7 +53,6 @@ class ChatAiService
      * Produit une réponse à partir de la question de l'utilisateur.
      *
      * @param  array<int, array{role: string, content: string}>  $history  historique de session (avant la question)
-     *
      * @return array{
      *     reply: string,
      *     notice: ?string,
@@ -303,7 +302,7 @@ class ChatAiService
                 return [
                     'status' => 'done',
                     'reply' => "Je suis l'assistant AquaSecure et je suis limité aux zones de gestion et à leurs alertes. "
-                        ."Je ne peux pas répondre à cette question. Essayez par exemple : « Quelles zones sont les plus risquées ? », "
+                        .'Je ne peux pas répondre à cette question. Essayez par exemple : « Quelles zones sont les plus risquées ? », '
                         ."« Combien d'alertes critiques cette semaine ? » ou « Résumé de la zone Tunis ».",
                     'tools_used' => [],
                 ];
@@ -621,7 +620,7 @@ class ChatAiService
             ."- Résumé de la zone Tunis\n"
             ."- Alertes des 7 derniers jours\n"
             ."- Combien d'alertes critiques ce mois-ci ?\n"
-            ."- Quelles sont les alertes prioritaires ?");
+            .'- Quelles sont les alertes prioritaires ?');
 
         $ids = $this->collectIds($executed);
 
@@ -899,7 +898,7 @@ PROMPT;
                 ."- period_days : nombre de jours si mentionné (« 7 jours » -> 7), sinon null\n"
                 ."- severity : low | medium | high | critical si mentionnée, sinon null\n"
                 ."- limit : nombre d'éléments souhaités, sinon null\n"
-                ."Hors périmètre (zones/alertes AquaSecure) -> intent \"off_topic\".",
+                .'Hors périmètre (zones/alertes AquaSecure) -> intent "off_topic".',
         ];
 
         if (is_string($previousContent) && trim($previousContent) !== '') {

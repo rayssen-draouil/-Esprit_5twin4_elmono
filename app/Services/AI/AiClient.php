@@ -38,10 +38,9 @@ class AiClient
      * Appel « chat/completions » attendu en JSON strict.
      *
      * @param  array<int, array{role: string, content: string}>  $messages
+     * @return array<string, mixed>
      *
      * @throws AiException
-     *
-     * @return array<string, mixed>
      */
     public function chatJson(array $messages, ?float $temperature = null): array
     {
@@ -150,12 +149,11 @@ class AiClient
      * comportement de chatJson() utilisé par l'analyse des zones/alertes.
      *
      * @param  array<int, array<string, mixed>>  $messages
-     * @param  array<string, mixed>  $extra        clés additionnelles du payload (tools, …)
+     * @param  array<string, mixed>  $extra  clés additionnelles du payload (tools, …)
      * @param  array{base_url?: string, key?: string, model?: string, timeout?: int, connect_timeout?: int, temperature?: float}  $overrides
+     * @return array<string, mixed>
      *
      * @throws AiException
-     *
-     * @return array<string, mixed>
      */
     public function chatRaw(array $messages, array $extra = [], array $overrides = []): array
     {
@@ -216,7 +214,7 @@ class AiClient
             throw new AiException(
                 'AI rate limit exceeded.',
                 429,
-                "Le quota ou la limite de requêtes du service IA a été atteint. Patientez un instant."
+                'Le quota ou la limite de requêtes du service IA a été atteint. Patientez un instant.'
             );
         }
 
@@ -260,9 +258,10 @@ class AiClient
     /**
      * Décode la réponse du modèle en retirant d'éventuelles fences markdown.
      *
-     * @throws AiException
      *
      * @return array<string, mixed>
+     *
+     * @throws AiException
      */
     protected function decodeJson(string $content): array
     {

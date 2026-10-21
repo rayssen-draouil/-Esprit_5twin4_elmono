@@ -25,7 +25,7 @@ class FinancementController extends Controller
         $query = Financement::with(['project', 'user']);
         $query->when($request->filled('status'), fn (Builder $builder) => $builder->where('status', $request->string('status')));
         $query->when($request->filled('project_id'), fn (Builder $builder) => $builder->where('project_id', $request->integer('project_id')));
-        $query->when($request->filled('source'), fn (Builder $builder) => $builder->where('source', 'like', '%' . $request->string('source') . '%'));
+        $query->when($request->filled('source'), fn (Builder $builder) => $builder->where('source', 'like', '%'.$request->string('source').'%'));
 
         $financements = $query->latest()->paginate(10)->withQueryString();
         $amounts = Financement::query()->selectRaw('status, SUM(amount) as total')->groupBy('status')->pluck('total', 'status');

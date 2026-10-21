@@ -121,7 +121,7 @@ return new class extends Migration
     /**
      * Réécrit les affectations avec les identifiants utilisateurs.
      *
-     * @param array<int, int> $idMap
+     * @param  array<int, int>  $idMap
      */
     protected function remapTechnicianIds(array $idMap): void
     {
@@ -140,11 +140,11 @@ return new class extends Migration
             $placeholders[] = '?';
         }
 
-        $caseSql = 'CASE technician_id ' . implode(' ', $cases) . ' ELSE technician_id END';
+        $caseSql = 'CASE technician_id '.implode(' ', $cases).' ELSE technician_id END';
 
         foreach (['maintenances', 'interventions', 'maintenance_assignment_invitations'] as $table) {
             DB::statement(
-                "UPDATE {$table} SET technician_id = {$caseSql} WHERE technician_id IN (" . implode(', ', $placeholders) . ')',
+                "UPDATE {$table} SET technician_id = {$caseSql} WHERE technician_id IN (".implode(', ', $placeholders).')',
                 array_merge($bindings, array_keys($idMap))
             );
         }

@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Services\ProjectFinancialService;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Illuminate\Support\Carbon;
+use Illuminate\View\View;
 
 class FinancialDashboardController extends Controller
 {
@@ -16,7 +16,7 @@ class FinancialDashboardController extends Controller
         // Get projects accessible to the user (based on role)
         $user = $request->user();
         $projects = Project::with(['budgetRevisions', 'expenses', 'expenses.expensePayments', 'financements', 'user'])
-            ->when($user->role !== 'admin', function ($query) use ($user) {
+            ->when($user->role !== 'admin', function ($query) {
                 // For non-admins, we could filter by user_id if projects were associated with users.
                 // Since the existing projects do not have user_id set, and the financial dashboard is
                 // intended for monitoring by admins/managers/gestionnaires, we show all projects.
@@ -58,18 +58,18 @@ class FinancialDashboardController extends Controller
         // Budget vs Réalisé data
         $budgetVsReal = [
             'projects' => $projects->pluck('name'),
-            'initial_budget' => $projects->map(function($p) {
-                return app(\App\Services\ProjectFinancialService::class)->getInitialBudget($p);
+            'initial_budget' => $projects->map(function ($p) {
+                return app(ProjectFinancialService::class)->getInitialBudget($p);
             }),
-            'revised_budget' => $projects->map(function($p) {
-                return app(\App\Services\ProjectFinancialService::class)->getRevisedBudget($p);
+            'revised_budget' => $projects->map(function ($p) {
+                return app(ProjectFinancialService::class)->getRevisedBudget($p);
             }),
-            'engaged_expenses' => $projects->map(function($p) {
-                return app(\App\Services\ProjectFinancialService::class)->getEngagedExpenses($p);
+            'engaged_expenses' => $projects->map(function ($p) {
+                return app(ProjectFinancialService::class)->getEngagedExpenses($p);
             }),
-            'paid_amounts' => $projects->map(function($p) {
-                return app(\App\Services\ProjectFinancialService::class)->getPaidAmounts($p);
-            })
+            'paid_amounts' => $projects->map(function ($p) {
+                return app(ProjectFinancialService::class)->getPaidAmounts($p);
+            }),
         ];
 
         // Funding by source
@@ -78,7 +78,7 @@ class FinancialDashboardController extends Controller
             $financings = $project->financements()->where('status', 'received')->get();
             foreach ($financings as $financing) {
                 $source = $financing->source;
-                if (!isset($fundingBySource[$source])) {
+                if (! isset($fundingBySource[$source])) {
                     $fundingBySource[$source] = 0;
                 }
                 $fundingBySource[$source] += $financing->amount;
@@ -134,11 +134,11 @@ class FinancialDashboardController extends Controller
         $alerts = [];
 
         foreach ($projects as $project) {
-            $initialBudget = app(\App\Services\ProjectFinancialService::class)->getInitialBudget($project);
-            $revisedBudget = app(\App\Services\ProjectFinancialService::class)->getRevisedBudget($project);
-            $confirmedFunding = app(\App\Services\ProjectFinancialService::class)->getConfirmedFunding($project);
-            $engagedExpenses = app(\App\Services\ProjectFinancialService::class)->getEngagedExpenses($project);
-            $paidAmounts = app(\App\Services\ProjectFinancialService::class)->getPaidAmounts($project);
+            $initialBudget = app(ProjectFinancialService::class)->getInitialBudget($project);
+            $revisedBudget = app(ProjectFinancialService::class)->getRevisedBudget($project);
+            $confirmedFunding = app(ProjectFinancialService::class)->getConfirmedFunding($project);
+            $engagedExpenses = app(ProjectFinancialService::class)->getEngagedExpenses($project);
+            $paidAmounts = app(ProjectFinancialService::class)->getPaidAmounts($project);
 
             // Budget exceeded alert
             if ($revisedBudget > 0 && $engagedExpenses > $revisedBudget) {
@@ -146,8 +146,8 @@ class FinancialDashboardController extends Controller
                     'type' => 'budget_exceeded',
                     'icon' => '!',
                     'title' => "Dépassement budgétaire sur {$project->name}",
-                    'description' => "Les dépenses engagées (" . number_format($engagedExpenses, 0, ',', ' ') . " €) dépassent le budget révisé (" . number_format($revisedBudget, 0, ',', ' ') . " €).",
-                    'action_url' => route('projects.show', $project)
+                    'description' => 'Les dépenses engagées ('.number_format($engagedExpenses, 0, ',', ' ').' €) dépassent le budget révisé ('.number_format($revisedBudget, 0, ',', ' ').' €).',
+                    'action_url' => route('projects.show', $project),
                 ];
             }
 
@@ -157,8 +157,8 @@ class FinancialDashboardController extends Controller
                     'type' => 'insufficient_funding',
                     'icon' => '↗',
                     'title' => "Financement insuffisant pour {$project->name}",
-                    'description' => "Le financement confirmé (" . number_format($confirmedFunding, 0, ',', ' ') . " €) est inférieur au budget révisé (" . number_format($revisedBudget, 0, ',', ' ') . " €).",
-                    'action_url' => route('projects.show', $project)
+                    'description' => 'Le financement confirmé ('.number_format($confirmedFunding, 0, ',', ' ').' €) est inférieur au budget révisé ('.number_format($revisedBudget, 0, ',', ' ').' €).',
+                    'action_url' => route('projects.show', $project),
                 ];
             }
 
@@ -170,7 +170,7 @@ class FinancialDashboardController extends Controller
                     'icon' => '⏳',
                     'title' => "Révision budgétaire en attente pour {$project->name}",
                     'description' => "$pendingRevisions demande(s) de révision budgétaire en attente d'approbation.",
-                    'action_url' => route('projects.show', $project)
+                    'action_url' => route('projects.show', $project),
                 ];
             }
 
@@ -182,7 +182,7 @@ class FinancialDashboardController extends Controller
                     'icon' => '⏳',
                     'title' => "Dépenses en attente d'approbation pour {$project->name}",
                     'description' => "$pendingExpenses dépense(s) en attente d'approbation.",
-                    'action_url' => route('projects.show', $project)
+                    'action_url' => route('projects.show', $project),
                 ];
             }
 
@@ -198,7 +198,7 @@ class FinancialDashboardController extends Controller
                     'icon' => '⏳',
                     'title' => "Paiements en attente de confirmation pour {$project->name}",
                     'description' => "$pendingPaiements paiement(s) en attente de confirmation.",
-                    'action_url' => route('projects.show', $project)
+                    'action_url' => route('projects.show', $project),
                 ];
             }
         }

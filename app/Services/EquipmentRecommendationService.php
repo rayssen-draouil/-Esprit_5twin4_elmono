@@ -8,6 +8,7 @@ use App\Models\Incident;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class EquipmentRecommendationService
 {
@@ -78,7 +79,7 @@ class EquipmentRecommendationService
 
     private function normalizeText(string $text): string
     {
-        return mb_strtolower(\Illuminate\Support\Str::ascii($text));
+        return mb_strtolower(Str::ascii($text));
     }
 
     private function terms(string $text): array

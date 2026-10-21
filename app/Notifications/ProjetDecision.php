@@ -36,7 +36,7 @@ class ProjetDecision extends Notification implements ShouldQueue
 
         return new DatabaseMessage([
             'title' => 'Décision sur votre projet',
-            'message' => "Votre projet \"{$this->project->name}\" a été {$label}." . ($this->comment ? " Commentaire : {$this->comment}" : ''),
+            'message' => "Votre projet \"{$this->project->name}\" a été {$label}.".($this->comment ? " Commentaire : {$this->comment}" : ''),
             'type' => 'project_decision',
             'action' => $this->action,
             'resource_type' => 'project',

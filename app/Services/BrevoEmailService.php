@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Intervention;
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
-use App\Models\Intervention;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -14,13 +14,21 @@ use Illuminate\Support\Facades\URL;
 class BrevoEmailService
 {
     protected ?string $apiKey;
+
     protected string $senderName;
+
     protected string $senderEmail;
+
     protected int $timeout;
+
     protected string $apiUrl = 'https://api.brevo.com/v3/smtp/email';
+
     protected ?string $smtpHost;
+
     protected ?int $smtpPort;
+
     protected ?string $smtpUser;
+
     protected ?string $smtpPass;
 
     public function __construct()
@@ -46,11 +54,11 @@ class BrevoEmailService
         $maintenance = $invitation->maintenance;
         $infra = $maintenance->infrastructure;
 
-        if (empty($technician?->email) || !filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
+        if (empty($technician?->email) || ! filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
             return [
                 'success' => false,
                 'message_id' => null,
-                'error' => "Adresse email du technicien invalide ou manquante.",
+                'error' => 'Adresse email du technicien invalide ou manquante.',
             ];
         }
 
@@ -71,7 +79,7 @@ class BrevoEmailService
 
         $html = $this->buildInvitationHtml(
             technicianName: $technician->name,
-            referenceCode: $maintenance->reference_code ?? ('MNT-#' . $maintenance->id),
+            referenceCode: $maintenance->reference_code ?? ('MNT-#'.$maintenance->id),
             infraName: $infra?->name ?? 'Infrastructure non spécifiée',
             infraType: $infra?->type ?? 'Réseau hydraulique',
             zoneName: $infra?->zone?->name ?? 'Zone d\'intervention',
@@ -175,11 +183,11 @@ class BrevoEmailService
      */
     public function sendClosureNotification(Maintenance $maintenance, User $technician): array
     {
-        if (empty($technician->email) || !filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
+        if (empty($technician->email) || ! filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
             return [
                 'success' => false,
                 'message_id' => null,
-                'error' => "Adresse email du technicien invalide.",
+                'error' => 'Adresse email du technicien invalide.',
             ];
         }
 
@@ -187,7 +195,7 @@ class BrevoEmailService
 
         $html = $this->buildClosureHtml(
             technicianName: $technician->name,
-            referenceCode: $maintenance->reference_code ?? ('MNT-#' . $maintenance->id),
+            referenceCode: $maintenance->reference_code ?? ('MNT-#'.$maintenance->id),
             infraName: $maintenance->infrastructure?->name ?? 'Infrastructure',
             closedAt: ($maintenance->completion_validated_at ?? now())->format('d/m/Y à H:i'),
             managerNotes: $maintenance->manager_validation_notes
@@ -208,11 +216,11 @@ class BrevoEmailService
      */
     public function sendCorrectionsRequestedNotification(Maintenance $maintenance, User $technician, string $notes): array
     {
-        if (empty($technician->email) || !filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
+        if (empty($technician->email) || ! filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
             return [
                 'success' => false,
                 'message_id' => null,
-                'error' => "Adresse email du technicien invalide.",
+                'error' => 'Adresse email du technicien invalide.',
             ];
         }
 
@@ -220,7 +228,7 @@ class BrevoEmailService
 
         $html = $this->buildCorrectionsHtml(
             technicianName: $technician->name,
-            referenceCode: $maintenance->reference_code ?? ('MNT-#' . $maintenance->id),
+            referenceCode: $maintenance->reference_code ?? ('MNT-#'.$maintenance->id),
             notes: $notes
         );
 
@@ -252,7 +260,7 @@ class BrevoEmailService
                         ->subject($subject);
                 });
 
-                $messageId = $sentMessage?->getMessageId() ?? ('brevo-smtp-' . uniqid('', true));
+                $messageId = $sentMessage?->getMessageId() ?? ('brevo-smtp-'.uniqid('', true));
 
                 Log::info('Brevo SMTP email dispatched successfully', [
                     'recipient' => $this->maskEmail($recipientEmail),
@@ -266,7 +274,7 @@ class BrevoEmailService
                     'error' => null,
                 ];
             } catch (\Throwable $e) {
-                Log::warning('Brevo SMTP dispatch failed: ' . $e->getMessage(), [
+                Log::warning('Brevo SMTP dispatch failed: '.$e->getMessage(), [
                     'recipient' => $this->maskEmail($recipientEmail),
                 ]);
 
@@ -275,7 +283,7 @@ class BrevoEmailService
                     return [
                         'success' => false,
                         'message_id' => null,
-                        'error' => "Échec d'envoi via Brevo SMTP: " . $e->getMessage(),
+                        'error' => "Échec d'envoi via Brevo SMTP: ".$e->getMessage(),
                     ];
                 }
             }
@@ -284,10 +292,11 @@ class BrevoEmailService
         // 2. Secondary: Fallback to Brevo REST API
         if (empty($this->apiKey)) {
             Log::warning('Brevo email skipped: neither SMTP nor API key configured in services.brevo');
+
             return [
                 'success' => false,
                 'message_id' => null,
-                'error' => "Clé API Brevo non configurée (services.brevo.api_key) et SMTP indisponible.",
+                'error' => 'Clé API Brevo non configurée (services.brevo.api_key) et SMTP indisponible.',
             ];
         }
 
@@ -315,7 +324,7 @@ class BrevoEmailService
                 'Accept' => 'application/json',
             ])->timeout($this->timeout);
 
-            if (!$sslVerify) {
+            if (! $sslVerify) {
                 $client = $client->withoutVerifying();
             }
 
@@ -362,14 +371,14 @@ class BrevoEmailService
             return [
                 'success' => false,
                 'message_id' => null,
-                'error' => "Échec de connexion au service d'email Brevo: " . $e->getMessage(),
+                'error' => "Échec de connexion au service d'email Brevo: ".$e->getMessage(),
             ];
         }
     }
 
     protected function isSmtpConfigured(): bool
     {
-        return !empty($this->smtpHost) && !empty($this->smtpUser) && !empty($this->smtpPass);
+        return ! empty($this->smtpHost) && ! empty($this->smtpUser) && ! empty($this->smtpPass);
     }
 
     protected function maskEmail(string $email): string
@@ -378,8 +387,9 @@ class BrevoEmailService
         if (count($parts) !== 2) {
             return '***';
         }
-        $name = substr($parts[0], 0, 2) . '***';
-        return $name . '@' . $parts[1];
+        $name = substr($parts[0], 0, 2).'***';
+
+        return $name.'@'.$parts[1];
     }
 
     protected function buildInvitationHtml(
@@ -627,11 +637,11 @@ HTML;
      */
     public function sendTechnicianAcceptedNotificationToManager(Maintenance $maintenance, User $technician, User $manager): array
     {
-        if (empty($manager->email) || !filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
-            return ['success' => false, 'message_id' => null, 'error' => "Email gestionnaire manquant ou invalide."];
+        if (empty($manager->email) || ! filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => 'Email gestionnaire manquant ou invalide.'];
         }
 
-        $ref = $maintenance->reference_code ?? ('MNT-#' . $maintenance->id);
+        $ref = $maintenance->reference_code ?? ('MNT-#'.$maintenance->id);
         $subject = "⚡ Ordre d'intervention accepté par {$technician->name} — {$ref}";
         $html = $this->buildManagerAcceptedHtml(
             managerName: $manager->name,
@@ -649,11 +659,11 @@ HTML;
      */
     public function sendProlongationNotificationToManager(Maintenance $maintenance, User $technician, User $manager, int $days, string $reason): array
     {
-        if (empty($manager->email) || !filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
-            return ['success' => false, 'message_id' => null, 'error' => "Email gestionnaire manquant ou invalide."];
+        if (empty($manager->email) || ! filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => 'Email gestionnaire manquant ou invalide.'];
         }
 
-        $ref = $maintenance->reference_code ?? ('MNT-#' . $maintenance->id);
+        $ref = $maintenance->reference_code ?? ('MNT-#'.$maintenance->id);
         $subject = "⏳ Demande de prolongation (+{$days}j) — {$ref}";
         $html = $this->buildManagerProlongationHtml(
             managerName: $manager->name,
@@ -673,11 +683,11 @@ HTML;
      */
     public function sendTechnicianCompletedNotificationToManager(Maintenance $maintenance, User $technician, User $manager, int $healthScore = 100): array
     {
-        if (empty($manager->email) || !filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
-            return ['success' => false, 'message_id' => null, 'error' => "Email gestionnaire manquant ou invalide."];
+        if (empty($manager->email) || ! filter_var($manager->email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message_id' => null, 'error' => 'Email gestionnaire manquant ou invalide.'];
         }
 
-        $ref = $maintenance->reference_code ?? ('MNT-#' . $maintenance->id);
+        $ref = $maintenance->reference_code ?? ('MNT-#'.$maintenance->id);
         $subject = "✓ Intervention achevée avec succès (Santé: {$healthScore}%) — {$ref}";
         $html = $this->buildManagerCompletedHtml(
             managerName: $manager->name,
@@ -820,4 +830,3 @@ HTML;
 HTML;
     }
 }
-

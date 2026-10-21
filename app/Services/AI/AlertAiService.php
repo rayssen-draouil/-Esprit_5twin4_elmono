@@ -36,9 +36,8 @@ class AlertAiService
     /**
      * Analyse complète d'une alerte.
      *
-     * @param  bool  $force   Ignore le cache et relance l'analyse.
-     * @param  bool  $persist Persiste le résultat dans les colonnes `ai_*`.
-     *
+     * @param  bool  $force  Ignore le cache et relance l'analyse.
+     * @param  bool  $persist  Persiste le résultat dans les colonnes `ai_*`.
      * @return array<string, mixed>
      */
     public function analyze(Alert $alert, bool $force = false, bool $persist = true): array
@@ -236,7 +235,6 @@ class AlertAiService
      * Construction de l'analyse (IA si configurée, sinon déterministe).
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<string, mixed>
      */
     protected function buildAnalysis(Alert $alert, array $facts, bool $persist): array
@@ -288,7 +286,6 @@ class AlertAiService
      * Messages envoyés au modèle (données métier uniquement).
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<int, array{role: string, content: string}>
      */
     protected function messages(Alert $alert, array $facts): array
@@ -351,7 +348,6 @@ PROMPT;
      *
      * @param  array<string, mixed>  $raw
      * @param  array<string, mixed>  $facts
-     *
      * @return array<string, mixed>
      */
     protected function normalizeAiResult(array $raw, Alert $alert, array $facts): array
@@ -407,7 +403,6 @@ PROMPT;
      * Analyse 100% déterministe (repli sans IA).
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<string, mixed>
      */
     public function deterministicAnalysis(Alert $alert, array $facts): array
@@ -468,7 +463,6 @@ PROMPT;
      * Points d'attention de l'alerte.
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<int, string>
      */
     protected function buildHighlights(array $facts): array
@@ -502,7 +496,6 @@ PROMPT;
      * Actions recommandées déterministes pour le technicien.
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<int, array{action: string, reason: string, priority: string}>
      */
     protected function defaultActions(array $facts): array
@@ -551,7 +544,6 @@ PROMPT;
     /**
      * Normalisation robuste des actions recommandées (objets ou chaînes).
      *
-     * @param  mixed  $raw
      *
      * @return array<int, array{action: string, reason: string, priority: string}>
      */

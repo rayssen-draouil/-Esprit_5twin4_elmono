@@ -10,9 +10,13 @@ use Illuminate\Support\Facades\Log;
 class GroqAiService
 {
     protected ?string $apiKey;
+
     protected string $model;
+
     protected string $baseUrl;
+
     protected int $timeout;
+
     protected int $connectTimeout;
 
     public function __construct()
@@ -29,22 +33,21 @@ class GroqAiService
      */
     public function isConfigured(): bool
     {
-        return !empty($this->apiKey) && is_string($this->apiKey) && strlen(trim($this->apiKey)) > 5;
+        return ! empty($this->apiKey) && is_string($this->apiKey) && strlen(trim($this->apiKey)) > 5;
     }
 
     /**
      * Call the Groq chat completion API with structured JSON output expectation.
      *
-     * @param array $messages Array of ['role' => '...', 'content' => '...']
-     * @param float $temperature
-     * @param array|null $responseSchema Optional JSON schema definition
+     * @param  array  $messages  Array of ['role' => '...', 'content' => '...']
+     * @param  array|null  $responseSchema  Optional JSON schema definition
      * @return array Decoded JSON response
      *
      * @throws GroqAiException
      */
     public function chatCompletionJson(array $messages, float $temperature = 0.2, ?array $responseSchema = null): array
     {
-        if (!$this->isConfigured()) {
+        if (! $this->isConfigured()) {
             throw new GroqAiException(
                 'Groq API key is not configured in environment.',
                 503,
@@ -69,13 +72,13 @@ class GroqAiService
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Authorization' => 'Bearer '.$this->apiKey,
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
             ])
-            ->connectTimeout($this->connectTimeout)
-            ->timeout($this->timeout)
-            ->post("{$this->baseUrl}/chat/completions", $payload);
+                ->connectTimeout($this->connectTimeout)
+                ->timeout($this->timeout)
+                ->post("{$this->baseUrl}/chat/completions", $payload);
 
             if ($response->status() === 429) {
                 Log::warning('Groq AI API rate limit reached.');
@@ -95,23 +98,23 @@ class GroqAiService
                 );
             }
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Groq AI API request error', [
                     'status' => $response->status(),
                     'error' => $response->json('error.message') ?? $response->body(),
                 ]);
 
                 throw new GroqAiException(
-                    'Groq API returned HTTP error ' . $response->status(),
+                    'Groq API returned HTTP error '.$response->status(),
                     $response->status(),
-                    'Le service d\'analyse IA a rencontré une erreur de traitement (Code ' . $response->status() . ').'
+                    'Le service d\'analyse IA a rencontré une erreur de traitement (Code '.$response->status().').'
                 );
             }
 
             $body = $response->json();
             $content = $body['choices'][0]['message']['content'] ?? null;
 
-            if (empty($content) || !is_string($content)) {
+            if (empty($content) || ! is_string($content)) {
                 throw new GroqAiException(
                     'Groq returned empty response content.',
                     500,
@@ -133,7 +136,7 @@ class GroqAiService
 
             $decoded = json_decode($cleanContent, true);
 
-            if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
                 Log::error('Groq returned invalid JSON', [
                     'json_error' => json_last_error_msg(),
                     'raw_content' => substr($cleanContent, 0, 500),
@@ -161,7 +164,7 @@ class GroqAiService
         } catch (\Throwable $e) {
             Log::error('Unexpected exception during Groq AI call', ['message' => $e->getMessage()]);
             throw new GroqAiException(
-                'Unexpected error during Groq AI call: ' . $e->getMessage(),
+                'Unexpected error during Groq AI call: '.$e->getMessage(),
                 500,
                 'Une erreur inattendue est survenue lors de l\'interaction avec le service IA.',
                 $e instanceof \Exception ? $e : null

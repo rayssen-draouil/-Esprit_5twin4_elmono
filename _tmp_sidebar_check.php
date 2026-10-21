@@ -1,12 +1,13 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 
 $user = User::where('role', 'admin')->first();
 echo 'Utilisateur: '.$user?->name.' role='.$user?->role.PHP_EOL;
 
-$kernel = app(Illuminate\Contracts\Http\Kernel::class);
+$kernel = app(Kernel::class);
 $request = Request::create('/back', 'GET');
 $request->setUserResolver(fn () => $user);
 auth()->setUser($user);

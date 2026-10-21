@@ -227,9 +227,9 @@ class MaintenanceIntelligenceController extends Controller
 
         // 2. Format description with technical checklist if provided
         $description = trim((string) ($validated['description'] ?? ''));
-        if (!empty($validated['checklist']) && is_array($validated['checklist'])) {
+        if (! empty($validated['checklist']) && is_array($validated['checklist'])) {
             $cleanChecklist = array_filter(array_map('trim', $validated['checklist']));
-            if (!empty($cleanChecklist)) {
+            if (! empty($cleanChecklist)) {
                 $description .= "\n\n--- GAMME OPÉRATOIRE & CHECKLIST ---\n";
                 foreach ($cleanChecklist as $item) {
                     $description .= "[ ] {$item}\n";
@@ -260,7 +260,7 @@ class MaintenanceIntelligenceController extends Controller
                     $infra->status = 'maintenance';
                 }
 
-                if (!empty($maint->next_maintenance_date)) {
+                if (! empty($maint->next_maintenance_date)) {
                     $infra->next_maintenance_date = $maint->next_maintenance_date;
                 }
                 $infra->save();

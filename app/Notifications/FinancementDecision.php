@@ -3,7 +3,6 @@
 namespace App\Notifications;
 
 use App\Models\Financement;
-use App\Models\Project;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\DatabaseMessage;
@@ -37,7 +36,7 @@ class FinancementDecision extends Notification implements ShouldQueue
 
         return new DatabaseMessage([
             'title' => 'Décision sur votre financement',
-            'message' => "Votre financement \"{$this->financement->source}\" a été {$label} sur le projet \"{$this->financement->project->name}\"." . ($this->comment ? " Commentaire : {$this->comment}" : ''),
+            'message' => "Votre financement \"{$this->financement->source}\" a été {$label} sur le projet \"{$this->financement->project->name}\".".($this->comment ? " Commentaire : {$this->comment}" : ''),
             'type' => 'financement_decision',
             'action' => $this->action,
             'resource_type' => 'financement',

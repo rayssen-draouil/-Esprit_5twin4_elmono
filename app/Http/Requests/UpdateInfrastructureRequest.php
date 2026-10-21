@@ -53,7 +53,7 @@ class UpdateInfrastructureRequest extends FormRequest
             if ($lastMnt && $nextMnt && strtotime($nextMnt) <= strtotime($lastMnt)) {
                 $v->errors()->add(
                     'next_maintenance_date',
-                    'La date de prochaine maintenance doit être strictement postérieure à la date de dernière maintenance (' . date('d/m/Y', strtotime($lastMnt)) . ').'
+                    'La date de prochaine maintenance doit être strictement postérieure à la date de dernière maintenance ('.date('d/m/Y', strtotime($lastMnt)).').'
                 );
             }
         });

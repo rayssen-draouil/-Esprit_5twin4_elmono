@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -176,11 +175,11 @@ class Maintenance extends Model
 
     public function getIsOverdueAttribute(): bool
     {
-        if (!$this->scheduled_at || $this->status === 'reported') {
+        if (! $this->scheduled_at || $this->status === 'reported') {
             return false;
         }
 
-        return $this->scheduled_at->isPast() && !in_array($this->status, ['completed', 'cancelled'], true);
+        return $this->scheduled_at->isPast() && ! in_array($this->status, ['completed', 'cancelled'], true);
     }
 
     public function getDisplayStatusAttribute(): string
@@ -231,7 +230,7 @@ class Maintenance extends Model
 
     public function canBeAccepted(): bool
     {
-        return $this->status === 'planned' && !$this->isLocked();
+        return $this->status === 'planned' && ! $this->isLocked();
     }
 
     public function isInProgress(): bool
@@ -275,27 +274,30 @@ class Maintenance extends Model
     {
         if ($this->status === 'completed') {
             $date = $this->completed_at ?? $this->performed_at ?? $this->updated_at;
-            return 'Terminée le ' . $date->format('d/m/Y');
+
+            return 'Terminée le '.$date->format('d/m/Y');
         }
 
-        if (!$this->scheduled_at) {
+        if (! $this->scheduled_at) {
             return 'Date non définie';
         }
 
         if ($this->is_overdue) {
             $diffDays = (int) abs($this->scheduled_at->diffInDays(now()));
+
             return $diffDays === 0 ? 'En retard (prévue plus tôt)' : "En retard de {$diffDays} j.";
         }
 
         if ($this->scheduled_at->isToday()) {
-            return 'Aujourd’hui à ' . $this->scheduled_at->format('H:i');
+            return 'Aujourd’hui à '.$this->scheduled_at->format('H:i');
         }
 
         if ($this->scheduled_at->isTomorrow()) {
-            return 'Demain à ' . $this->scheduled_at->format('H:i');
+            return 'Demain à '.$this->scheduled_at->format('H:i');
         }
 
         $diffDays = (int) now()->diffInDays($this->scheduled_at, false);
+
         return "Dans {$diffDays} jours";
     }
 }

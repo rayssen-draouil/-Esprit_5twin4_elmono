@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Models\Alert;
 use App\Models\Zone;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Alert>
+ * @extends Factory<Alert>
  */
 class AlertFactory extends Factory
 {

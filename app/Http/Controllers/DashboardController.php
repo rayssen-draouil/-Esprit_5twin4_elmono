@@ -81,5 +81,8 @@ class DashboardController extends Controller
         ));
     }
 
-    public function citizen(): View { return view('dashboards.citizen'); }
+    public function citizen(): View
+    {
+        return view('dashboards.citizen');
+    }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Maintenance;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -54,7 +55,7 @@ class UpdateMaintenanceRequest extends FormRequest
             // Logic 0: Locked technician assignment cannot be silently changed
             $maintenanceId = $this->route('maintenance')?->id ?? $this->route('maintenance');
             if ($maintenanceId) {
-                $maintenance = \App\Models\Maintenance::find($maintenanceId);
+                $maintenance = Maintenance::find($maintenanceId);
                 if ($maintenance && $maintenance->technician_assignment_locked && $this->has('technician_id')) {
                     if ((int) $this->input('technician_id') !== (int) $maintenance->technician_id) {
                         $v->errors()->add(
@@ -77,7 +78,7 @@ class UpdateMaintenanceRequest extends FormRequest
             if ($startedAt && $completedAt && strtotime($completedAt) < strtotime($startedAt)) {
                 $v->errors()->add(
                     'completed_at',
-                    'La date d’achèvement des travaux doit être égale ou postérieure à la date de début sur site (' . date('d/m/Y H:i', strtotime($startedAt)) . ').'
+                    'La date d’achèvement des travaux doit être égale ou postérieure à la date de début sur site ('.date('d/m/Y H:i', strtotime($startedAt)).').'
                 );
             }
 

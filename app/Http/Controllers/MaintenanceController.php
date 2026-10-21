@@ -12,12 +12,12 @@ use App\Services\TechnicianAssignmentInvitationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class MaintenanceController extends Controller
 {
     protected MaintenanceLifecycleService $lifecycleService;
+
     protected TechnicianAssignmentInvitationService $invitationService;
 
     public function __construct(
@@ -151,7 +151,7 @@ class MaintenanceController extends Controller
                 $infra->status = 'maintenance';
             }
 
-            if (!empty($maintenance->next_maintenance_date)) {
+            if (! empty($maintenance->next_maintenance_date)) {
                 $infra->next_maintenance_date = $maintenance->next_maintenance_date;
             }
             $infra->save();
@@ -217,7 +217,7 @@ class MaintenanceController extends Controller
                 $infra->status = 'maintenance';
             }
 
-            if (!empty($maintenance->next_maintenance_date)) {
+            if (! empty($maintenance->next_maintenance_date)) {
                 $infra->next_maintenance_date = $maintenance->next_maintenance_date;
             }
             $infra->save();
@@ -260,7 +260,7 @@ class MaintenanceController extends Controller
         $request->validate([
             'correction_notes' => ['required', 'string', 'min:5', 'max:2000'],
         ], [
-            'correction_notes.required' => "Veuillez préciser les motifs ou compléments techniques demandés au technicien.",
+            'correction_notes.required' => 'Veuillez préciser les motifs ou compléments techniques demandés au technicien.',
         ]);
 
         try {
@@ -289,7 +289,7 @@ class MaintenanceController extends Controller
             ? redirect()->route('manager.dashboard')
             : redirect()->back();
 
-        if (!$maintenance->technician_id) {
+        if (! $maintenance->technician_id) {
             return $target->with('error', "Aucun technicien n'est sélectionné pour cette opération.");
         }
 
@@ -299,11 +299,11 @@ class MaintenanceController extends Controller
             managerId: Auth::id()
         );
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             return $target->with('error', $result['message']);
         }
 
-        if (!$result['email_sent']) {
+        if (! $result['email_sent']) {
             return $target->with('error', $result['message']);
         }
 
@@ -312,7 +312,7 @@ class MaintenanceController extends Controller
 
     public function destroy(Maintenance $maintenance): RedirectResponse
     {
-        $ref = $maintenance->reference_code ?? ('#' . $maintenance->id);
+        $ref = $maintenance->reference_code ?? ('#'.$maintenance->id);
         $maintenance->delete();
 
         return redirect()
@@ -369,7 +369,7 @@ class MaintenanceController extends Controller
         $filters = [];
 
         if ($request->filled('search')) {
-            $filters['search'] = ['label' => 'Recherche : ' . $request->input('search'), 'param' => 'search'];
+            $filters['search'] = ['label' => 'Recherche : '.$request->input('search'), 'param' => 'search'];
         }
         if ($request->filled('quick')) {
             $labels = [
@@ -384,25 +384,25 @@ class MaintenanceController extends Controller
                 $filters['quick'] = ['label' => $labels[$request->input('quick')], 'param' => 'quick'];
             }
         }
-        if ($request->filled('status') && !$request->filled('quick')) {
-            $filters['status'] = ['label' => 'Statut : ' . ucfirst($request->input('status')), 'param' => 'status'];
+        if ($request->filled('status') && ! $request->filled('quick')) {
+            $filters['status'] = ['label' => 'Statut : '.ucfirst($request->input('status')), 'param' => 'status'];
         }
         if ($request->filled('type')) {
-            $filters['type'] = ['label' => 'Type : ' . $request->input('type'), 'param' => 'type'];
+            $filters['type'] = ['label' => 'Type : '.$request->input('type'), 'param' => 'type'];
         }
         if ($request->filled('priority')) {
-            $filters['priority'] = ['label' => 'Priorité : ' . ucfirst($request->input('priority')), 'param' => 'priority'];
+            $filters['priority'] = ['label' => 'Priorité : '.ucfirst($request->input('priority')), 'param' => 'priority'];
         }
         if ($request->filled('infrastructure_id')) {
             $infra = Infrastructure::find($request->input('infrastructure_id'));
             if ($infra) {
-                $filters['infrastructure_id'] = ['label' => 'Infra : ' . $infra->name, 'param' => 'infrastructure_id'];
+                $filters['infrastructure_id'] = ['label' => 'Infra : '.$infra->name, 'param' => 'infrastructure_id'];
             }
         }
         if ($request->filled('technician_id')) {
             $tech = User::find($request->input('technician_id'));
             if ($tech) {
-                $filters['technician_id'] = ['label' => 'Technicien : ' . $tech->name, 'param' => 'technician_id'];
+                $filters['technician_id'] = ['label' => 'Technicien : '.$tech->name, 'param' => 'technician_id'];
             }
         }
 

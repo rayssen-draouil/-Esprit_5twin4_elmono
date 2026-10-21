@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -157,7 +158,7 @@ class PublicZoneAlertController extends Controller
             'explanation' => $alert->citizenExplanation(),
             'actions' => $alert->citizenActions(),
             'timeline' => $alert->publicTimeline(),
-            'metaDescription' => \Illuminate\Support\Str::limit($alert->citizenExplanation(), 150),
+            'metaDescription' => Str::limit($alert->citizenExplanation(), 150),
         ]);
     }
 
@@ -322,7 +323,7 @@ class PublicZoneAlertController extends Controller
         return [
             'id' => $alert->id,
             'type' => $alert->type,
-            'message' => \Illuminate\Support\Str::limit((string) $alert->message, 150),
+            'message' => Str::limit((string) $alert->message, 150),
             'severity' => $alert->severity,
             'severityLabel' => $alert->severity_label,
             'aiSeverity' => $alert->ai_severity,
@@ -360,9 +361,9 @@ class PublicZoneAlertController extends Controller
     {
         return match ($riskLevel) {
             'critical' => "Cette zone fait l'objet d'une vigilance maximale. Nos équipes sont mobilisées et des restrictions d'usage peuvent s'appliquer.",
-            'high' => "La situation est sensible dans cette zone. Nos équipes surveillent le réseau de près et vous recommandent la prudence.",
-            'medium' => "La situation est stable, avec quelques points de vigilance suivis par nos équipes.",
-            default => "La situation est normale dans cette zone. Le réseau est suivi en continu.",
+            'high' => 'La situation est sensible dans cette zone. Nos équipes surveillent le réseau de près et vous recommandent la prudence.',
+            'medium' => 'La situation est stable, avec quelques points de vigilance suivis par nos équipes.',
+            default => 'La situation est normale dans cette zone. Le réseau est suivi en continu.',
         };
     }
 

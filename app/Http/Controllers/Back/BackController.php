@@ -71,8 +71,8 @@ class BackController extends Controller
             ['label' => 'Incidents actifs', 'value' => sprintf('%02d', $activeIncidents), 'trend' => 'Données réelles'],
             ['label' => 'Infrastructures critiques', 'value' => sprintf('%02d', $criticalInfras), 'trend' => 'Données réelles'],
             ['label' => 'Projets actifs', 'value' => (string) $inProgressProjects, 'trend' => 'Données réelles'],
-            ['label' => 'Budget total', 'value' => number_format($revisedBudgetTotal, 0, ',', ' ') . ' €', 'trend' => number_format($confirmedFundingTotal, 0, ',', ' ') . ' € financés'],
-            ['label' => 'Validations en attente', 'value' => (string) ($pendingProjects + $pendingFinancements), 'trend' => $pendingProjects . ' projets · ' . $pendingFinancements . ' financements'],
+            ['label' => 'Budget total', 'value' => number_format($revisedBudgetTotal, 0, ',', ' ').' €', 'trend' => number_format($confirmedFundingTotal, 0, ',', ' ').' € financés'],
+            ['label' => 'Validations en attente', 'value' => (string) ($pendingProjects + $pendingFinancements), 'trend' => $pendingProjects.' projets · '.$pendingFinancements.' financements'],
         ];
 
         $activity = $this->getRecentActivity();
@@ -118,7 +118,7 @@ class BackController extends Controller
                 default => $decision->action_type,
             };
             $resourceLabel = $decision->resource_type === 'project' ? 'projet' : 'financement';
-            $items[] = "{$label} {$resourceLabel} · " . ($decision->user->name ?? 'Système');
+            $items[] = "{$label} {$resourceLabel} · ".($decision->user->name ?? 'Système');
         }
 
         $recentSignalements = Signalement::latest('reported_at')->take(3)->get();
@@ -140,7 +140,7 @@ class BackController extends Controller
             ];
 
             return [
-                'id' => 'INC-' . str_pad($item->id, 4, '0', STR_PAD_LEFT),
+                'id' => 'INC-'.str_pad($item->id, 4, '0', STR_PAD_LEFT),
                 'raw_id' => $item->id,
                 'title' => $item->description,
                 'type' => $item->type,
@@ -260,9 +260,9 @@ class BackController extends Controller
     public function projects(): View
     {
         $projects = Project::all()->map(function ($item) {
-            $budgetFormatted = number_format($item->budget / 1000000, 1, ',', ' ') . ' M€';
+            $budgetFormatted = number_format($item->budget / 1000000, 1, ',', ' ').' M€';
             if ($item->budget < 1000000) {
-                $budgetFormatted = number_format($item->budget / 1000, 0, ',', ' ') . ' k€';
+                $budgetFormatted = number_format($item->budget / 1000, 0, ',', ' ').' k€';
             }
 
             return [
@@ -280,9 +280,9 @@ class BackController extends Controller
     public function funding(): View
     {
         $funding = Financement::with('project')->get()->map(function ($item) {
-            $amountFormatted = number_format($item->amount / 1000000, 1, ',', ' ') . ' M€';
+            $amountFormatted = number_format($item->amount / 1000000, 1, ',', ' ').' M€';
             if ($item->amount < 1000000) {
-                $amountFormatted = number_format($item->amount / 1000, 0, ',', ' ') . ' k€';
+                $amountFormatted = number_format($item->amount / 1000, 0, ',', ' ').' k€';
             }
 
             return [

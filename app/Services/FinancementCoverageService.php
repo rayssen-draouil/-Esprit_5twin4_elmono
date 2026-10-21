@@ -8,18 +8,23 @@ use App\Models\Project;
 class FinancementCoverageService
 {
     public const ALERTE_ROUGE = 'rouge';
+
     public const ALERTE_ORANGE = 'orange';
+
     public const ALERTE_BLEU = 'bleu';
+
     public const ALERTE_VERT = 'vert';
 
     public const SEUIL_ROUGE = 10;
+
     public const SEUIL_ORANGE = 30;
+
     public const SEUIL_BLEU = 50;
 
     /**
      * Calcule l'analyse de couverture financière pour une demande de financement.
      *
-     * @param Financement $financement La demande en cours d'évaluation
+     * @param  Financement  $financement  La demande en cours d'évaluation
      * @return array{
      *   budget: float,
      *   confirmed_others: float,

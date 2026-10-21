@@ -7,12 +7,12 @@ use App\Models\Alert;
 use App\Models\Zone;
 use App\Services\AI\ChatAiService;
 use App\Services\AI\ChatTools;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Http\Client\ConnectionException;
 
 /**
  * Assistant conversationnel AquaSecure (lecture seule, zones + alertes).

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +27,7 @@ class TwoFactorController extends Controller
     public function verifyChallenge(Request $request, TwoFactorAuthenticationProvider $provider): RedirectResponse
     {
         $validated = $request->validate(['code' => ['required', 'string', 'max:64']]);
-        $user = \App\Models\User::findOrFail(session('auth.2fa.user_id'));
+        $user = User::findOrFail(session('auth.2fa.user_id'));
         $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
         $valid = $provider->verify($secret, $validated['code']);
 

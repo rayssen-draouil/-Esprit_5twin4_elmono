@@ -40,8 +40,7 @@ class InterventionSchedulingService
         ?string $scheduledAt,
         ?int $durationMinutes,
         ?int $ignoreInterventionId = null
-    ): Collection
-    {
+    ): Collection {
         $hasSchedule = $scheduledAt !== null && $durationMinutes !== null;
         $start = $hasSchedule ? Carbon::parse($scheduledAt) : null;
         $end = $start?->copy()->addMinutes($durationMinutes ?? 0);

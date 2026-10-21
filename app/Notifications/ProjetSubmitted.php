@@ -2,7 +2,6 @@
 
 namespace App\Notifications;
 
-use App\Models\Financement;
 use App\Models\Project;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,7 +26,7 @@ class ProjetSubmitted extends Notification implements ShouldQueue
     {
         return new DatabaseMessage([
             'title' => 'Nouveau projet soumis pour validation',
-            'message' => "Le projet \"{$this->project->name}\" a été soumis pour approbation." . ($this->comment ? " Commentaire : {$this->comment}" : ''),
+            'message' => "Le projet \"{$this->project->name}\" a été soumis pour approbation.".($this->comment ? " Commentaire : {$this->comment}" : ''),
             'type' => 'project_submitted',
             'resource_type' => 'project',
             'resource_id' => $this->project->id,

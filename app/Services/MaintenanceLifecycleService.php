@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Notifications\MaintenanceStatusNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -48,18 +49,18 @@ class MaintenanceLifecycleService
             }
 
             // 2. Lifecycle state verification
-            if (!in_array($locked->status, ['in_progress', 'awaiting_validation'])) {
+            if (! in_array($locked->status, ['in_progress', 'awaiting_validation'])) {
                 throw new \DomainException("L'intervention doit être en cours d'exécution pour être confirmée comme terminée (statut actuel : {$locked->display_status_label}).");
             }
 
             // 3. Technical report requirement
             $resultText = trim($reportData['result'] ?? '');
             if (empty($resultText)) {
-                throw new \InvalidArgumentException("Le compte-rendu technique détaillé des travaux est obligatoire.");
+                throw new \InvalidArgumentException('Le compte-rendu technique détaillé des travaux est obligatoire.');
             }
 
             $submittedAt = now();
-            if (!empty($reportData['completed_at'])) {
+            if (! empty($reportData['completed_at'])) {
                 $parsed = strtotime($reportData['completed_at']);
                 if ($parsed && $parsed <= time()) {
                     $submittedAt = now()->setTimestamp($parsed);
@@ -85,7 +86,7 @@ class MaintenanceLifecycleService
             $locked->status = 'completed'; // Step 2 to Step 3
             $locked->manager_correction_notes = null;
 
-            if (!empty($reportData['duration_hours']) && is_numeric($reportData['duration_hours'])) {
+            if (! empty($reportData['duration_hours']) && is_numeric($reportData['duration_hours'])) {
                 $locked->duration_hours = (float) $reportData['duration_hours'];
             }
 
@@ -96,7 +97,7 @@ class MaintenanceLifecycleService
             $infra = $locked->infrastructure;
             if ($infra) {
                 $infra->last_maintenance_date = $submittedAt->format('Y-m-d');
-                if (!$infra->next_maintenance_date || $infra->next_maintenance_date->isPast()) {
+                if (! $infra->next_maintenance_date || $infra->next_maintenance_date->isPast()) {
                     $infra->next_maintenance_date = now()->addMonths(6)->format('Y-m-d');
                 }
 
@@ -111,7 +112,7 @@ class MaintenanceLifecycleService
                     $infra->condition = 'excellent';
 
                     // Update AI health analysis cache to 100%
-                    if (!empty($infra->ai_health_analysis) && is_array($infra->ai_health_analysis)) {
+                    if (! empty($infra->ai_health_analysis) && is_array($infra->ai_health_analysis)) {
                         $aiData = $infra->ai_health_analysis;
                         $aiData['health_score'] = 100;
                         $aiData['overall_risk_level'] = 'low';
@@ -149,15 +150,15 @@ class MaintenanceLifecycleService
             $managers = User::whereIn('role', ['manager', 'gestionnaire', 'admin'])->get();
             foreach ($managers as $mgr) {
                 try {
-                    $mgr->notify(new \App\Notifications\MaintenanceStatusNotification($locked, 'completed', $technician, ['health_score' => $healthScore]));
+                    $mgr->notify(new MaintenanceStatusNotification($locked, 'completed', $technician, ['health_score' => $healthScore]));
                 } catch (\Throwable $e) {
-                    Log::warning('Failed sending in-app notification for completed maintenance: ' . $e->getMessage());
+                    Log::warning('Failed sending in-app notification for completed maintenance: '.$e->getMessage());
                 }
 
                 try {
                     $this->brevoService->sendTechnicianCompletedNotificationToManager($locked, $technician, $mgr, $healthScore);
                 } catch (\Throwable $e) {
-                    Log::warning('Failed sending completion email to manager: ' . $e->getMessage());
+                    Log::warning('Failed sending completion email to manager: '.$e->getMessage());
                 }
             }
 
@@ -186,17 +187,17 @@ class MaintenanceLifecycleService
             }
 
             // 2. State verification
-            if (!in_array($locked->status, ['in_progress', 'planned'])) {
+            if (! in_array($locked->status, ['in_progress', 'planned'])) {
                 throw new \DomainException("Seules les opérations en cours ou planifiées peuvent faire l'objet d'une prolongation.");
             }
 
             if ($days < 1 || $days > 60) {
-                throw new \InvalidArgumentException("La durée de prolongation doit être comprise entre 1 et 60 jours.");
+                throw new \InvalidArgumentException('La durée de prolongation doit être comprise entre 1 et 60 jours.');
             }
 
             $reason = trim($reason);
             if (empty($reason)) {
-                throw new \InvalidArgumentException("Veuillez préciser le motif de prolongation pour le gestionnaire.");
+                throw new \InvalidArgumentException('Veuillez préciser le motif de prolongation pour le gestionnaire.');
             }
 
             // 3. Calculate new scheduled date
@@ -227,18 +228,18 @@ class MaintenanceLifecycleService
             $managers = User::whereIn('role', ['manager', 'gestionnaire', 'admin'])->get();
             foreach ($managers as $mgr) {
                 try {
-                    $mgr->notify(new \App\Notifications\MaintenanceStatusNotification($locked, 'prolonged', $technician, [
+                    $mgr->notify(new MaintenanceStatusNotification($locked, 'prolonged', $technician, [
                         'days' => $days,
                         'reason' => $reason,
                     ]));
                 } catch (\Throwable $e) {
-                    Log::warning('Failed sending in-app notification for prolonged maintenance: ' . $e->getMessage());
+                    Log::warning('Failed sending in-app notification for prolonged maintenance: '.$e->getMessage());
                 }
 
                 try {
                     $this->brevoService->sendProlongationNotificationToManager($locked, $technician, $mgr, $days, $reason);
                 } catch (\Throwable $e) {
-                    Log::warning('Failed sending prolongation email to manager: ' . $e->getMessage());
+                    Log::warning('Failed sending prolongation email to manager: '.$e->getMessage());
                 }
             }
 
@@ -329,11 +330,11 @@ class MaintenanceLifecycleService
             $locked = Maintenance::with('technician')->lockForUpdate()->findOrFail($maintenance->id);
 
             if ($locked->status !== 'awaiting_validation') {
-                throw new \DomainException("Une demande de correction ne peut être faite que sur une opération en attente de validation.");
+                throw new \DomainException('Une demande de correction ne peut être faite que sur une opération en attente de validation.');
             }
 
             if (empty(trim($correctionNotes))) {
-                throw new \InvalidArgumentException("Veuillez préciser les motifs de correction ou les compléments demandés.");
+                throw new \InvalidArgumentException('Veuillez préciser les motifs de correction ou les compléments demandés.');
             }
 
             $locked->status = 'in_progress';

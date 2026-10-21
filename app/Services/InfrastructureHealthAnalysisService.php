@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Exceptions\GroqAiException;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use Carbon\Carbon;
@@ -16,10 +15,6 @@ class InfrastructureHealthAnalysisService
 
     /**
      * Run a comprehensive health analysis for an infrastructure.
-     *
-     * @param Infrastructure|int $infrastructure
-     * @param bool $persist
-     * @return array
      */
     public function analyze(Infrastructure|int $infrastructure, bool $persist = true): array
     {
@@ -96,12 +91,12 @@ class InfrastructureHealthAnalysisService
         if ($infra->next_maintenance_date) {
             if ($infra->next_maintenance_date->isPast()) {
                 $delay = (int) abs($infra->next_maintenance_date->diffInDays(now()));
-                $facts[] = "Prochaine échéance fixée au " . $infra->next_maintenance_date->format('d/m/Y') . " (dépassée de {$delay} j.).";
+                $facts[] = 'Prochaine échéance fixée au '.$infra->next_maintenance_date->format('d/m/Y')." (dépassée de {$delay} j.).";
             } elseif ($infra->is_maintenance_due_soon) {
                 $days = (int) now()->diffInDays($infra->next_maintenance_date);
                 $facts[] = "Échéance de maintenance imminente prévue dans {$days} jour(s) ({$infra->next_maintenance_date->format('d/m/Y')}).";
             } else {
-                $facts[] = "Prochaine maintenance planifiée le " . $infra->next_maintenance_date->format('d/m/Y') . ".";
+                $facts[] = 'Prochaine maintenance planifiée le '.$infra->next_maintenance_date->format('d/m/Y').'.';
             }
         } else {
             $missingData[] = "Aucune prochaine date de maintenance n'est programmée dans le calendrier.";
@@ -134,13 +129,13 @@ class InfrastructureHealthAnalysisService
         if ($openIncidents->isNotEmpty()) {
             $facts[] = "{$openIncidents->count()} incident(s) non résolu(s) affectent cet ouvrage.";
             foreach ($openIncidents as $inc) {
-                $facts[] = "Incident {$inc->type} (gravité: {$inc->severity}) signalé le " . ($inc->reported_at ? $inc->reported_at->format('d/m/Y') : 'N/A') . " : " . substr((string) $inc->description, 0, 100);
+                $facts[] = "Incident {$inc->type} (gravité: {$inc->severity}) signalé le ".($inc->reported_at ? $inc->reported_at->format('d/m/Y') : 'N/A').' : '.substr((string) $inc->description, 0, 100);
             }
 
             if ($openIncidents->whereIn('severity', ['high', 'critical'])->isNotEmpty()) {
                 $riskFactors[] = [
                     'title' => 'Incidents graves non résolus sur site',
-                    'explanation' => "Des anomalies ou fuites de gravité élevée/critique sont en cours de traitement.",
+                    'explanation' => 'Des anomalies ou fuites de gravité élevée/critique sont en cours de traitement.',
                     'evidence' => "{$openIncidents->count()} incident(s) actif(s) répertorié(s).",
                     'urgency' => 'high',
                 ];
@@ -148,8 +143,8 @@ class InfrastructureHealthAnalysisService
         }
 
         // 5. Missing data verification
-        if (!$infra->last_maintenance_date) {
-            $missingData[] = "Historique de dernière maintenance non renseigné.";
+        if (! $infra->last_maintenance_date) {
+            $missingData[] = 'Historique de dernière maintenance non renseigné.';
         }
         $completedMissingReports = $infra->maintenances->where('status', 'completed')->filter(fn ($m) => empty($m->result));
         if ($completedMissingReports->isNotEmpty()) {
@@ -182,7 +177,7 @@ class InfrastructureHealthAnalysisService
      */
     protected function callGroqHealthAnalysis(Infrastructure $infra, array $facts): array
     {
-        $systemPrompt = <<<PROMPT
+        $systemPrompt = <<<'PROMPT'
 Vous êtes le système expert d'ingénierie et de santé des infrastructures hydrauliques AquaSecure.
 Votre mission est de fournir un diagnostic technique objectif, fondé STRICTEMENT sur les enregistrements de la base de données.
 
@@ -197,7 +192,7 @@ PROMPT;
         $userContext = [
             'infrastructure' => [
                 'id' => $infra->id,
-                'reference_code' => $infra->reference_code ?? ('INF-' . $infra->id),
+                'reference_code' => $infra->reference_code ?? ('INF-'.$infra->id),
                 'name' => $infra->name,
                 'type' => $infra->type,
                 'zone' => $infra->zone?->name,
@@ -219,19 +214,19 @@ PROMPT;
         ];
 
         $userPrompt = "Analysez l'état technique de cette infrastructure hydraulique à partir des données ci-dessous :\n\n"
-            . json_encode($userContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-            . "\n\nProduisez un JSON structuré contenant exactement :\n"
-            . "- infrastructure_id : {$infra->id}\n"
-            . "- assessment_title : Titre concis du diagnostic\n"
-            . "- condition_summary : Synthèse claire de l'état fonctionnel\n"
-            . "- overall_risk_level : 'critical' | 'high' | 'medium' | 'low'\n"
-            . "- top_risk_factors : Tableau de 1 à 3 objets maximum (title, explanation, evidence, urgency)\n"
-            . "- recommended_actions : Tableau d'actions ordonnées par urgence (action, reason, urgency, requires_review)\n"
-            . "- maintenance_checklist : Tableau de points de contrôle recommandés\n"
-            . "- missing_information : Données d'exploitation manquantes ou incomplètes\n"
-            . "- evidence : Faits avérés issus des données réelles\n"
-            . "- uncertainties : Incertitudes techniques identifiées\n"
-            . "- maintenance_recommended : true ou false\n";
+            .json_encode($userContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            ."\n\nProduisez un JSON structuré contenant exactement :\n"
+            ."- infrastructure_id : {$infra->id}\n"
+            ."- assessment_title : Titre concis du diagnostic\n"
+            ."- condition_summary : Synthèse claire de l'état fonctionnel\n"
+            ."- overall_risk_level : 'critical' | 'high' | 'medium' | 'low'\n"
+            ."- top_risk_factors : Tableau de 1 à 3 objets maximum (title, explanation, evidence, urgency)\n"
+            ."- recommended_actions : Tableau d'actions ordonnées par urgence (action, reason, urgency, requires_review)\n"
+            ."- maintenance_checklist : Tableau de points de contrôle recommandés\n"
+            ."- missing_information : Données d'exploitation manquantes ou incomplètes\n"
+            ."- evidence : Faits avérés issus des données réelles\n"
+            ."- uncertainties : Incertitudes techniques identifiées\n"
+            ."- maintenance_recommended : true ou false\n";
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -248,7 +243,7 @@ PROMPT;
     {
         $allowedLevels = ['critical', 'high', 'medium', 'low'];
         $riskLevel = strtolower((string) ($raw['overall_risk_level'] ?? $facts['overall_risk_level']));
-        if (!in_array($riskLevel, $allowedLevels, true)) {
+        if (! in_array($riskLevel, $allowedLevels, true)) {
             $riskLevel = $facts['overall_risk_level'];
         }
 
@@ -267,7 +262,7 @@ PROMPT;
                 ];
             }
         }
-        if (empty($cleanFactors) && !empty($facts['risk_factors'])) {
+        if (empty($cleanFactors) && ! empty($facts['risk_factors'])) {
             $cleanFactors = $facts['risk_factors'];
         }
 
@@ -304,7 +299,7 @@ PROMPT;
         }
 
         // Checklist
-        $checklist = is_array($raw['maintenance_checklist'] ?? null) && !empty($raw['maintenance_checklist'])
+        $checklist = is_array($raw['maintenance_checklist'] ?? null) && ! empty($raw['maintenance_checklist'])
             ? array_map('strval', $raw['maintenance_checklist'])
             : [
                 'Vérification visuelle d\'étanchéité des vannes et raccords',
@@ -316,7 +311,7 @@ PROMPT;
         return [
             'infrastructure_id' => $infra->id,
             'infrastructure_name' => $infra->name,
-            'reference_code' => $infra->reference_code ?? ('INF-' . $infra->id),
+            'reference_code' => $infra->reference_code ?? ('INF-'.$infra->id),
             'assessment_title' => (string) ($raw['assessment_title'] ?? "Diagnostic de santé - {$infra->name}"),
             'condition_summary' => (string) ($raw['condition_summary'] ?? "L'ouvrage est actuellement au statut {$infra->status_label} avec un niveau de condition {$infra->condition_label}."),
             'overall_risk_level' => $riskLevel,
@@ -324,10 +319,10 @@ PROMPT;
             'top_risk_factors' => $cleanFactors,
             'recommended_actions' => $cleanActions,
             'maintenance_checklist' => $checklist,
-            'missing_information' => is_array($raw['missing_information'] ?? null) && !empty($raw['missing_information'])
+            'missing_information' => is_array($raw['missing_information'] ?? null) && ! empty($raw['missing_information'])
                 ? array_map('strval', $raw['missing_information'])
                 : $facts['missing_data'],
-            'evidence' => is_array($raw['evidence'] ?? null) && !empty($raw['evidence'])
+            'evidence' => is_array($raw['evidence'] ?? null) && ! empty($raw['evidence'])
                 ? array_map('strval', $raw['evidence'])
                 : $facts['facts'],
             'uncertainties' => is_array($raw['uncertainties'] ?? null) ? array_map('strval', $raw['uncertainties']) : [],
@@ -370,7 +365,7 @@ PROMPT;
         return [
             'infrastructure_id' => $infra->id,
             'infrastructure_name' => $infra->name,
-            'reference_code' => $infra->reference_code ?? ('INF-' . $infra->id),
+            'reference_code' => $infra->reference_code ?? ('INF-'.$infra->id),
             'assessment_title' => "Évaluation déterministe de santé - {$infra->name}",
             'condition_summary' => "Diagnostic calculé sur les faits enregistrés : état {$infra->condition_label}, statut {$infra->status_label}, indice de santé à {$infra->health_score}%.",
             'overall_risk_level' => $riskLevel,

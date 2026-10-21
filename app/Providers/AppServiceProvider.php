@@ -4,8 +4,8 @@ namespace App\Providers;
 
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
-use Laravel\Fortify\Fortify;
 use Laravel\Fortify\Features;
+use Laravel\Fortify\Fortify;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,9 +22,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-         Features::twoFactorAuthentication([
-        'confirm' => true,
-    ]);
+        Features::twoFactorAuthentication([
+            'confirm' => true,
+        ]);
         Paginator::defaultView('vendor.pagination.aquasecure');
         Paginator::defaultSimpleView('vendor.pagination.aquasecure-simple');
     }

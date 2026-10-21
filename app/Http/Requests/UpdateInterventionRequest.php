@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Intervention;
 use App\Models\User;
+use App\Services\InterventionSchedulingService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -16,11 +18,11 @@ class UpdateInterventionRequest extends FormRequest
         $this->merge([
             'scheduled_duration_minutes' => $this->input(
                 'scheduled_duration_minutes',
-                $intervention instanceof \App\Models\Intervention
+                $intervention instanceof Intervention
                     ? $intervention->scheduled_duration_minutes
                     : 60
             ),
-            'priority' => $this->input('priority', $intervention instanceof \App\Models\Intervention
+            'priority' => $this->input('priority', $intervention instanceof Intervention
                 ? $intervention->priority
                 : 'medium'),
         ]);
@@ -62,11 +64,11 @@ class UpdateInterventionRequest extends FormRequest
             }
 
             $intervention = $this->route('intervention');
-            $interventionId = $intervention instanceof \App\Models\Intervention
+            $interventionId = $intervention instanceof Intervention
                 ? $intervention->getKey()
                 : (int) $intervention;
 
-            $conflicts = app(\App\Services\InterventionSchedulingService::class)->conflicts(
+            $conflicts = app(InterventionSchedulingService::class)->conflicts(
                 (int) $this->input('technician_id'),
                 (string) $this->input('scheduled_at'),
                 (int) $this->input('scheduled_duration_minutes'),
@@ -76,7 +78,7 @@ class UpdateInterventionRequest extends FormRequest
             if ($conflicts->isNotEmpty()) {
                 $validator->errors()->add(
                     'scheduled_at',
-                    app(\App\Services\InterventionSchedulingService::class)->conflictMessage($conflicts)
+                    app(InterventionSchedulingService::class)->conflictMessage($conflicts)
                 );
             }
         });

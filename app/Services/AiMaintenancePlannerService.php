@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Exceptions\GroqAiException;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\User;
@@ -18,8 +17,6 @@ class AiMaintenancePlannerService
     /**
      * Generate an AI-assisted maintenance proposal for a specific infrastructure and optional finding context.
      *
-     * @param int $infrastructureId
-     * @param array|null $findingContext
      * @return array Structured plan data
      */
     public function generatePlan(int $infrastructureId, ?array $findingContext = null): array
@@ -45,7 +42,7 @@ class AiMaintenancePlannerService
             'infrastructure' => [
                 'id' => $infrastructure->id,
                 'name' => $infrastructure->name,
-                'reference_code' => $infrastructure->reference_code ?? ('INF-' . $infrastructure->id),
+                'reference_code' => $infrastructure->reference_code ?? ('INF-'.$infrastructure->id),
                 'type' => $infrastructure->type,
                 'zone' => $infrastructure->zone?->name,
                 'location' => $infrastructure->location,
@@ -87,6 +84,7 @@ class AiMaintenancePlannerService
         if ($this->groqService->isConfigured()) {
             try {
                 $rawPlan = $this->callGroqPlanner($context);
+
                 return $this->validateAndNormalizePlan($rawPlan, $infrastructure, $findingContext);
             } catch (\Throwable $e) {
                 Log::warning('Groq plan generation failed, falling back to deterministic template', [
@@ -103,7 +101,7 @@ class AiMaintenancePlannerService
      */
     protected function callGroqPlanner(array $context): array
     {
-        $systemPrompt = <<<PROMPT
+        $systemPrompt = <<<'PROMPT'
 Vous êtes le planificateur technique principal de la régie des eaux AquaSecure.
 Votre mission est d'élaborer une proposition de plan d'intervention de maintenance préventive ou corrective adaptée à une infrastructure hydraulique spécifique.
 
@@ -118,29 +116,29 @@ RÈGLES D'EXCELLENCE ET DE SÉCURITÉ :
 PROMPT;
 
         $userPrompt = "Voici le contexte complet de l'infrastructure et du risque identifié :\n\n"
-            . json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-            . "\n\nGénérez la proposition de plan de maintenance sous forme d'un objet JSON contenant exactement :\n"
-            . "- plan_title : Titre professionnel de la gamme d'intervention\n"
-            . "- infrastructure_id : {$context['infrastructure']['id']}\n"
-            . "- maintenance_type : 'Préventive' | 'Corrective' | 'Inspection' | 'Réglementaire' | 'Urgence'\n"
-            . "- priority : 'low' | 'medium' | 'high' | 'critical'\n"
-            . "- justification : Explication argumentée basée sur l'état et l'historique de l'infrastructure\n"
-            . "- proposed_start_date : Date et heure suggérées (format 'Y-m-d H:i')\n"
-            . "- proposed_completion_window : Fenêtre d'exécution préconisée (ex: '24 heures', 'Demi-journée', '3 jours')\n"
-            . "- estimated_duration_hours : Nombre d'heures estimées (décimal, ex: 3.5)\n"
-            . "- estimated_cost : Coût financier indicatif estimé en dinars/euros (décimal, ex: 450.00)\n"
-            . "- required_skills : Tableau de compétences requises\n"
-            . "- recommended_technician_speciality : Spécialité technique recommandée\n"
-            . "- work_order_description : Descriptif détaillé des opérations à consigner sur l'ordre de travail\n"
-            . "- checklist : Tableau d'étapes techniques précises à cocher sur site\n"
-            . "- safety_considerations : Mesures de sécurité (EPI, consignation, balisage)\n"
-            . "- required_tools_or_materials : Outillage spécifique, pièces d'usure ou réactifs nécessaires\n"
-            . "- verification_steps : Contrôles d'étanchéité, essais en charge et mesures après intervention\n"
-            . "- expected_result : Résultat technique attendu à la clôture de la mission\n"
-            . "- follow_up_recommendations : Recommandations de surveillance après remise en service\n"
-            . "- suggested_next_maintenance_date : Date de prochaine échéance préconisée (format 'Y-m-d')\n"
-            . "- assumptions : Hypothèses formulées par l'IA\n"
-            . "- missing_information : Données manquantes nécessaires pour affiner la préparation\n";
+            .json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            ."\n\nGénérez la proposition de plan de maintenance sous forme d'un objet JSON contenant exactement :\n"
+            ."- plan_title : Titre professionnel de la gamme d'intervention\n"
+            ."- infrastructure_id : {$context['infrastructure']['id']}\n"
+            ."- maintenance_type : 'Préventive' | 'Corrective' | 'Inspection' | 'Réglementaire' | 'Urgence'\n"
+            ."- priority : 'low' | 'medium' | 'high' | 'critical'\n"
+            ."- justification : Explication argumentée basée sur l'état et l'historique de l'infrastructure\n"
+            ."- proposed_start_date : Date et heure suggérées (format 'Y-m-d H:i')\n"
+            ."- proposed_completion_window : Fenêtre d'exécution préconisée (ex: '24 heures', 'Demi-journée', '3 jours')\n"
+            ."- estimated_duration_hours : Nombre d'heures estimées (décimal, ex: 3.5)\n"
+            ."- estimated_cost : Coût financier indicatif estimé en dinars/euros (décimal, ex: 450.00)\n"
+            ."- required_skills : Tableau de compétences requises\n"
+            ."- recommended_technician_speciality : Spécialité technique recommandée\n"
+            ."- work_order_description : Descriptif détaillé des opérations à consigner sur l'ordre de travail\n"
+            ."- checklist : Tableau d'étapes techniques précises à cocher sur site\n"
+            ."- safety_considerations : Mesures de sécurité (EPI, consignation, balisage)\n"
+            ."- required_tools_or_materials : Outillage spécifique, pièces d'usure ou réactifs nécessaires\n"
+            ."- verification_steps : Contrôles d'étanchéité, essais en charge et mesures après intervention\n"
+            ."- expected_result : Résultat technique attendu à la clôture de la mission\n"
+            ."- follow_up_recommendations : Recommandations de surveillance après remise en service\n"
+            ."- suggested_next_maintenance_date : Date de prochaine échéance préconisée (format 'Y-m-d')\n"
+            ."- assumptions : Hypothèses formulées par l'IA\n"
+            ."- missing_information : Données manquantes nécessaires pour affiner la préparation\n";
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -157,13 +155,13 @@ PROMPT;
     {
         $allowedTypes = ['Préventive', 'Corrective', 'Inspection', 'Réglementaire', 'Urgence'];
         $type = (string) ($rawPlan['maintenance_type'] ?? 'Corrective');
-        if (!in_array($type, $allowedTypes, true)) {
+        if (! in_array($type, $allowedTypes, true)) {
             $type = ($infrastructure->condition === 'critical' || $infrastructure->status === 'critical') ? 'Urgence' : 'Corrective';
         }
 
         $allowedPriorities = ['low', 'medium', 'high', 'critical'];
         $priority = strtolower((string) ($rawPlan['priority'] ?? 'medium'));
-        if (!in_array($priority, $allowedPriorities, true)) {
+        if (! in_array($priority, $allowedPriorities, true)) {
             $priority = match ($infrastructure->criticality) {
                 'vital' => 'critical',
                 'high' => 'high',
@@ -175,7 +173,7 @@ PROMPT;
         $startDateStr = (string) ($rawPlan['proposed_start_date'] ?? '');
         $startDate = null;
         try {
-            if (!empty($startDateStr)) {
+            if (! empty($startDateStr)) {
                 $parsed = Carbon::parse($startDateStr);
                 if ($parsed->isPast()) {
                     $startDate = Carbon::tomorrow()->setTime(9, 0);
@@ -186,7 +184,7 @@ PROMPT;
         } catch (\Throwable) {
             $startDate = Carbon::tomorrow()->setTime(9, 0);
         }
-        if (!$startDate) {
+        if (! $startDate) {
             $startDate = Carbon::tomorrow()->setTime(9, 0);
         }
 
@@ -194,7 +192,7 @@ PROMPT;
         $nextDateStr = (string) ($rawPlan['suggested_next_maintenance_date'] ?? '');
         $nextDate = null;
         try {
-            if (!empty($nextDateStr)) {
+            if (! empty($nextDateStr)) {
                 $parsedNext = Carbon::parse($nextDateStr);
                 if ($parsedNext->isAfter($startDate)) {
                     $nextDate = $parsedNext->format('Y-m-d');
@@ -203,7 +201,7 @@ PROMPT;
         } catch (\Throwable) {
             $nextDate = null;
         }
-        if (!$nextDate) {
+        if (! $nextDate) {
             $monthsToAdd = ($type === 'Inspection') ? 3 : 6;
             $nextDate = $startDate->copy()->addMonths($monthsToAdd)->format('Y-m-d');
         }
@@ -218,22 +216,22 @@ PROMPT;
             $cost = null;
         }
 
-        $checklist = is_array($rawPlan['checklist'] ?? null) && !empty($rawPlan['checklist'])
+        $checklist = is_array($rawPlan['checklist'] ?? null) && ! empty($rawPlan['checklist'])
             ? array_map('strval', $rawPlan['checklist'])
             : [
                 "Balisage et sécurisation du périmètre d'intervention",
                 "Consignation hydraulique et vérification de l'absence de pression",
                 "Inspection visuelle et démontage des organes d'usure",
-                "Nettoyage, remplacement des joints et graissage",
+                'Nettoyage, remplacement des joints et graissage',
                 "Mise sous pression d'épreuve et contrôle d'étanchéité",
-                "Rédaction du compte-rendu technique et restitution",
+                'Rédaction du compte-rendu technique et restitution',
             ];
 
         return [
             'plan_title' => (string) ($rawPlan['plan_title'] ?? "Plan d'intervention - {$infrastructure->name}"),
             'infrastructure_id' => $infrastructure->id,
             'infrastructure_name' => $infrastructure->name,
-            'infrastructure_code' => $infrastructure->reference_code ?? ('INF-' . $infrastructure->id),
+            'infrastructure_code' => $infrastructure->reference_code ?? ('INF-'.$infrastructure->id),
             'infrastructure_type' => $infrastructure->type,
             'zone_name' => $infrastructure->zone?->name ?? 'Zone non assignée',
             'current_condition' => $infrastructure->condition_label,
@@ -243,7 +241,7 @@ PROMPT;
             'justification' => (string) ($rawPlan['justification'] ?? "Intervention technique requise suite au diagnostic de risque sur {$infrastructure->name}."),
             'proposed_start_date' => $startDate->format('Y-m-d\TH:i'),
             'proposed_start_date_display' => $startDate->format('d/m/Y H:i'),
-            'proposed_completion_window' => (string) ($rawPlan['proposed_completion_window'] ?? "1 jour ouvré"),
+            'proposed_completion_window' => (string) ($rawPlan['proposed_completion_window'] ?? '1 jour ouvré'),
             'estimated_duration_hours' => $duration,
             'estimated_cost' => $cost,
             'required_skills' => is_array($rawPlan['required_skills'] ?? null) ? array_map('strval', $rawPlan['required_skills']) : ['Hydraulique', 'Mécanique industrielle'],
@@ -253,7 +251,7 @@ PROMPT;
             'safety_considerations' => is_array($rawPlan['safety_considerations'] ?? null) ? array_map('strval', $rawPlan['safety_considerations']) : ['Port des EPI obligatoires', 'Vérification de l\'absence de pression résiduelle'],
             'required_tools_or_materials' => is_array($rawPlan['required_tools_or_materials'] ?? null) ? array_map('strval', $rawPlan['required_tools_or_materials']) : ['Jeu de clés dynamométriques', 'Kit de joints de rechange', 'Manomètre de contrôle'],
             'verification_steps' => is_array($rawPlan['verification_steps'] ?? null) ? array_map('strval', $rawPlan['verification_steps']) : ['Test d\'étanchéité à la pression nominale', 'Vérification de l\'absence de vibration anormale'],
-            'expected_result' => (string) ($rawPlan['expected_result'] ?? "Remise en service opérationnel sans fuite ni dysfonctionnement."),
+            'expected_result' => (string) ($rawPlan['expected_result'] ?? 'Remise en service opérationnel sans fuite ni dysfonctionnement.'),
             'follow_up_recommendations' => (string) ($rawPlan['follow_up_recommendations'] ?? "Contrôle visuel sous 15 jours par l'équipe de secteur."),
             'suggested_next_maintenance_date' => $nextDate,
             'assumptions' => is_array($rawPlan['assumptions'] ?? null) ? array_map('strval', $rawPlan['assumptions']) : ['Accès au site disponible sans contrainte météo'],
@@ -281,21 +279,21 @@ PROMPT;
         $nextDate = $startDate->copy()->addMonths(6)->format('Y-m-d');
 
         $checklist = [
-            "Prise de contact avec le gestionnaire de zone et vérification des accès",
+            'Prise de contact avec le gestionnaire de zone et vérification des accès',
             "Consignation hydraulique et isolement de la section d'ouvrage",
             "Contrôle d'intégrité structurelle et démontage des composants ciblés",
             "Remplacement des pièces d'usure, nettoyage et étanchéité",
-            "Essais de remise en eau et validation des pressions de service",
+            'Essais de remise en eau et validation des pressions de service',
             "Clôture de l'ordre de travail et consignation du compte-rendu",
         ];
 
-        $speciality = !empty($specialities) ? $specialities[0] : 'Hydraulique';
+        $speciality = ! empty($specialities) ? $specialities[0] : 'Hydraulique';
 
         return [
             'plan_title' => "Plan de maintenance opérationnelle - {$infrastructure->name}",
             'infrastructure_id' => $infrastructure->id,
             'infrastructure_name' => $infrastructure->name,
-            'infrastructure_code' => $infrastructure->reference_code ?? ('INF-' . $infrastructure->id),
+            'infrastructure_code' => $infrastructure->reference_code ?? ('INF-'.$infrastructure->id),
             'infrastructure_type' => $infrastructure->type,
             'zone_name' => $infrastructure->zone?->name ?? 'Zone non assignée',
             'current_condition' => $infrastructure->condition_label,
@@ -305,7 +303,7 @@ PROMPT;
             'justification' => "Plan d'intervention proposé pour traiter les alertes et maintenir l'intégrité opérationnelle de {$infrastructure->name}.",
             'proposed_start_date' => $startDate->format('Y-m-d\TH:i'),
             'proposed_start_date_display' => $startDate->format('d/m/Y H:i'),
-            'proposed_completion_window' => "1 à 2 jours ouvrés",
+            'proposed_completion_window' => '1 à 2 jours ouvrés',
             'estimated_duration_hours' => 4.0,
             'estimated_cost' => 350.00,
             'required_skills' => ['Hydraulique', 'Maintenance préventive'],
@@ -316,7 +314,7 @@ PROMPT;
             'required_tools_or_materials' => ['Outillage standard de serrage', 'Kit joints d\'étanchéité', 'Manomètre portatif'],
             'verification_steps' => ['Mesure de pression en régime établi', 'Inspection visuelle d\'étanchéité à 100% de charge'],
             'expected_result' => "Rétablissement ou consolidation des performances nominales de l'ouvrage.",
-            'follow_up_recommendations' => "Surveillance de la pression lors des 48 heures suivant la réouverture.",
+            'follow_up_recommendations' => 'Surveillance de la pression lors des 48 heures suivant la réouverture.',
             'suggested_next_maintenance_date' => $nextDate,
             'assumptions' => ['Estimation basée sur les caractéristiques moyennes des équipements similaires'],
             'missing_information' => [],

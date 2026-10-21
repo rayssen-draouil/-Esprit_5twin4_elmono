@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Services\InterventionSchedulingService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -52,7 +53,7 @@ class StoreInterventionRequest extends FormRequest
                 return;
             }
 
-            $conflicts = app(\App\Services\InterventionSchedulingService::class)->conflicts(
+            $conflicts = app(InterventionSchedulingService::class)->conflicts(
                 (int) $this->input('technician_id'),
                 (string) $this->input('scheduled_at'),
                 (int) $this->input('scheduled_duration_minutes'),
@@ -61,7 +62,7 @@ class StoreInterventionRequest extends FormRequest
             if ($conflicts->isNotEmpty()) {
                 $validator->errors()->add(
                     'scheduled_at',
-                    app(\App\Services\InterventionSchedulingService::class)->conflictMessage($conflicts)
+                    app(InterventionSchedulingService::class)->conflictMessage($conflicts)
                 );
             }
         });

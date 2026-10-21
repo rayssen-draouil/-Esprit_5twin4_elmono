@@ -2,17 +2,19 @@
 
 namespace App\Models;
 
+use App\Services\BrevoEmailService;
+use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
@@ -135,7 +137,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function sendPasswordResetNotification($token): void
     {
-        $result = app(\App\Services\BrevoEmailService::class)->sendPasswordResetNotification($this, $token);
+        $result = app(BrevoEmailService::class)->sendPasswordResetNotification($this, $token);
 
         if (! $result['success']) {
             throw new \RuntimeException('Password reset email could not be delivered.');
@@ -145,7 +147,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /** Send a signed verification link through the Brevo transactional service. */
     public function sendEmailVerificationNotification(): void
     {
-        $result = app(\App\Services\BrevoEmailService::class)->sendEmailVerificationNotification($this);
+        $result = app(BrevoEmailService::class)->sendEmailVerificationNotification($this);
 
         if (! $result['success']) {
             throw new \RuntimeException('Email verification message could not be delivered.');

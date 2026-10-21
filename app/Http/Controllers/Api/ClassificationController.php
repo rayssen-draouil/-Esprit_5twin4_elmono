@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AIClassificationService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ClassificationController extends Controller
 {
@@ -18,9 +18,6 @@ class ClassificationController extends Controller
 
     /**
      * Classifie une description de signalement
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function classify(Request $request): JsonResponse
     {
@@ -53,8 +50,6 @@ class ClassificationController extends Controller
 
     /**
      * Vérifie si le service de classification est disponible
-     *
-     * @return JsonResponse
      */
     public function health(): JsonResponse
     {

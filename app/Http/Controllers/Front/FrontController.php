@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Front;
 
 use App\Http\Controllers\Controller;
-use App\Models\Alert;
 use App\Http\Requests\ReportMalfunctionRequest;
+use App\Models\Alert;
 use App\Models\Financement;
 use App\Models\Incident;
 use App\Models\Infrastructure;
@@ -29,7 +29,7 @@ class FrontController extends Controller
                 'Sites sécurisés' => (string) max(Infrastructure::count(), 128),
                 'Alertes traitées' => (string) max(Incident::count() * 120, 2480),
                 'Communes partenaires' => (string) max(Zone::count() * 11, 34),
-            ]
+            ],
         ];
     }
 
@@ -99,6 +99,7 @@ class FrontController extends Controller
         if (empty($programs)) {
             $programs = ['Fonds bleu européen', 'Aqua Transition', 'Résilience territoriale'];
         }
+
         return view('front.funding', $this->shared() + ['programs' => $programs]);
     }
 
@@ -108,8 +109,8 @@ class FrontController extends Controller
             'articles' => [
                 'AquaSecure déploie son réseau de capteurs nouvelle génération',
                 'Un nouveau partenariat pour protéger nos littoraux',
-                'Bilan de la saison hydrologique 2025'
-            ]
+                'Bilan de la saison hydrologique 2025',
+            ],
         ]);
     }
 
@@ -375,6 +376,7 @@ class FrontController extends Controller
     {
         $zones = Zone::all();
         $infrastructures = Infrastructure::all();
+
         return view('front.incidents.create', $this->shared() + compact('zones', 'infrastructures'));
     }
 
@@ -398,10 +400,10 @@ class FrontController extends Controller
         }
 
         $zone = null;
-        if (!empty($validated['zone_id'])) {
+        if (! empty($validated['zone_id'])) {
             $zone = Zone::find($validated['zone_id']);
         }
-        if (!$zone) {
+        if (! $zone) {
             $zone = Zone::firstOrCreate(
                 ['name' => 'Secteur Local'],
                 ['address' => $validated['location'], 'risk_level' => 'medium']
@@ -413,12 +415,12 @@ class FrontController extends Controller
             'reporter_name' => auth()->user()->name,
             'reporter_email' => auth()->user()->email,
             'type' => $validated['type'],
-            'description' => $validated['description'] . (!empty($validated['title']) ? ' — ' . $validated['title'] : ''),
+            'description' => $validated['description'].(! empty($validated['title']) ? ' — '.$validated['title'] : ''),
             'location' => $validated['location'],
             'photo_path' => $photoPath,
             'priority' => $validated['priority'] ?? null,
             'status' => 'new',
-            'reported_at' => !empty($validated['incident_date']) ? $validated['incident_date'] : now(),
+            'reported_at' => ! empty($validated['incident_date']) ? $validated['incident_date'] : now(),
         ]);
 
         return redirect()
@@ -433,7 +435,7 @@ class FrontController extends Controller
             ->when(auth()->user()?->role === 'citizen', fn ($query) => $query->whereHas('signalements', fn ($signalements) => $signalements->where('user_id', auth()->id())))
             ->findOrFail($incidentId);
         $incidentData = [
-            'id' => 'INC-' . str_pad($record->id, 4, '0', STR_PAD_LEFT),
+            'id' => 'INC-'.str_pad($record->id, 4, '0', STR_PAD_LEFT),
             'title' => $record->description,
             'site' => $record->location ?? ($record->zone->name ?? 'Site non défini'),
             'priority' => match ($record->severity) {
@@ -498,18 +500,18 @@ class FrontController extends Controller
             'zone',
             'maintenances' => fn ($q) => $q->orderBy('scheduled_at', 'desc')->limit(10),
         ])
-        ->where('id', $infrastructure)
-        ->orWhere('reference_code', $infrastructure)
-        ->orWhere('name', $infrastructure)
-        ->first();
+            ->where('id', $infrastructure)
+            ->orWhere('reference_code', $infrastructure)
+            ->orWhere('name', $infrastructure)
+            ->first();
 
-        if (!$record) {
+        if (! $record) {
             abort(404, 'Infrastructure introuvable.');
         }
 
         return view('front.infrastructures.show', $this->shared() + [
             'infrastructure' => $record,
-            'infrastructureCode' => $record->reference_code ?? ('INF-' . $record->id),
+            'infrastructureCode' => $record->reference_code ?? ('INF-'.$record->id),
         ]);
     }
 
@@ -536,8 +538,8 @@ class FrontController extends Controller
             'status' => 'reported',
             'priority' => $validated['priority'],
             'scheduled_at' => now(),
-            'team' => 'Signalement usager (' . $reporter . ')',
-            'description' => "[Dysfonctionnement signalé : {$type}] " . $validated['description'] . " (Signalé par : {$reporter}" . ($phone ? " - Tél: {$phone}" : "") . ")",
+            'team' => 'Signalement usager ('.$reporter.')',
+            'description' => "[Dysfonctionnement signalé : {$type}] ".$validated['description']." (Signalé par : {$reporter}".($phone ? " - Tél: {$phone}" : '').')',
         ]);
 
         // If high or critical, update infrastructure status
@@ -569,7 +571,7 @@ class FrontController extends Controller
 
     private function projectsData(): array
     {
-        return Project::all()->map(fn($p) => [
+        return Project::all()->map(fn ($p) => [
             'name' => $p->name,
             'location' => 'France',
             'status' => $p->status === 'in_progress' ? 'En déploiement' : ($p->status === 'completed' ? 'Opérationnel' : 'À l’étude'),
@@ -580,8 +582,8 @@ class FrontController extends Controller
 
     private function incidentsData(): array
     {
-        return Incident::with('zone')->when(auth()->user()?->role === 'citizen', fn ($query) => $query->whereHas('signalements', fn ($signalements) => $signalements->where('user_id', auth()->id())))->orderByDesc('id')->get()->map(fn($i) => [
-            'id' => 'INC-' . str_pad($i->id, 4, '0', STR_PAD_LEFT),
+        return Incident::with('zone')->when(auth()->user()?->role === 'citizen', fn ($query) => $query->whereHas('signalements', fn ($signalements) => $signalements->where('user_id', auth()->id())))->orderByDesc('id')->get()->map(fn ($i) => [
+            'id' => 'INC-'.str_pad($i->id, 4, '0', STR_PAD_LEFT),
             'title' => $i->description,
             'site' => $i->location ?? ($i->zone->name ?? 'Zone'),
             'priority' => 'Critique',
@@ -592,7 +594,7 @@ class FrontController extends Controller
 
     private function infrastructureData(): array
     {
-        return Infrastructure::with('zone')->get()->map(fn($inf) => [
+        return Infrastructure::with('zone')->get()->map(fn ($inf) => [
             'name' => $inf->name,
             'type' => $inf->type,
             'region' => $inf->zone->name ?? 'France',

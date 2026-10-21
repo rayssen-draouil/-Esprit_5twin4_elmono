@@ -29,9 +29,8 @@ class ZoneAiService
     /**
      * Analyse complète d'une zone.
      *
-     * @param  bool  $force   Ignore le cache et relance l'analyse.
-     * @param  bool  $persist Persiste le résultat dans la base (colonnes ai_*).
-     *
+     * @param  bool  $force  Ignore le cache et relance l'analyse.
+     * @param  bool  $persist  Persiste le résultat dans la base (colonnes ai_*).
      * @return array<string, mixed>
      */
     public function analyze(Zone $zone, bool $force = false, bool $persist = true): array
@@ -190,7 +189,6 @@ class ZoneAiService
      * Points d'attention extraits des faits (utilisés par les deux branches).
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<int, string>
      */
     protected function buildHighlights(array $facts): array
@@ -233,7 +231,6 @@ class ZoneAiService
      * avec persistance optionnelle dans les colonnes `ai_*`.
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<string, mixed>
      */
     protected function buildAnalysis(Zone $zone, array $facts, bool $persist): array
@@ -286,7 +283,6 @@ class ZoneAiService
      * de la zone (jamais d'e-mail, mot de passe ou identifiant utilisateur).
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<int, array{role: string, content: string}>
      */
     protected function messages(Zone $zone, array $facts): array
@@ -357,7 +353,6 @@ PROMPT;
      *
      * @param  array<string, mixed>  $raw
      * @param  array<string, mixed>  $facts
-     *
      * @return array<string, mixed>
      */
     protected function normalizeAiResult(array $raw, Zone $zone, array $facts): array
@@ -402,7 +397,6 @@ PROMPT;
     /**
      * Normalisation robuste des recommandations (objets ou chaînes).
      *
-     * @param  mixed  $raw
      *
      * @return array<int, array{action: string, reason: string, priority: string}>
      */
@@ -439,7 +433,6 @@ PROMPT;
      * Analyse 100% déterministe (repli sans IA).
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<string, mixed>
      */
     public function deterministicAnalysis(Zone $zone, array $facts): array
@@ -483,7 +476,6 @@ PROMPT;
      * 3 à 5 recommandations de prévention concrètes déduites des faits.
      *
      * @param  array<string, mixed>  $facts
-     *
      * @return array<int, array{action: string, reason: string, priority: string}>
      */
     protected function defaultRecommendations(array $facts): array

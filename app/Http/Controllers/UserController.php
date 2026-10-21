@@ -23,17 +23,27 @@ class UserController extends Controller
         return view('users.index', compact('users'));
     }
 
-    public function create(): View { return view('users.create'); }
+    public function create(): View
+    {
+        return view('users.create');
+    }
 
     public function store(StoreUserRequest $request): RedirectResponse
     {
         User::create($request->safe()->except('password_confirmation'));
+
         return redirect()->route('admin.users.index')->with('success', 'Utilisateur créé.');
     }
 
-    public function edit(User $user): View { return view('users.edit', compact('user')); }
+    public function edit(User $user): View
+    {
+        return view('users.edit', compact('user'));
+    }
 
-    public function show(User $user): View { return view('users.show', compact('user')); }
+    public function show(User $user): View
+    {
+        return view('users.show', compact('user'));
+    }
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
@@ -44,16 +54,24 @@ class UserController extends Controller
         if ($user->role === 'admin' && $request->role !== 'admin' && User::where('role', 'admin')->count() <= 1) {
             return back()->withErrors(['role' => 'Le dernier administrateur doit conserver son rôle.'])->withInput();
         }
-        if ($request->filled('password')) $data['password'] = Hash::make($request->password);
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+        }
         $user->update($data);
+
         return redirect()->route('admin.users.index')->with('success', 'Utilisateur mis à jour.');
     }
 
     public function destroy(Request $request, User $user): RedirectResponse
     {
-        if ($request->user()->is($user)) return back()->withErrors(['user' => 'Vous ne pouvez pas supprimer votre propre compte.']);
-        if ($user->role === 'admin' && User::where('role', 'admin')->count() <= 1) return back()->withErrors(['user' => 'Le dernier administrateur ne peut pas être supprimé.']);
+        if ($request->user()->is($user)) {
+            return back()->withErrors(['user' => 'Vous ne pouvez pas supprimer votre propre compte.']);
+        }
+        if ($user->role === 'admin' && User::where('role', 'admin')->count() <= 1) {
+            return back()->withErrors(['user' => 'Le dernier administrateur ne peut pas être supprimé.']);
+        }
         $user->delete();
+
         return redirect()->route('admin.users.index')->with('success', 'Utilisateur supprimé.');
     }
 }

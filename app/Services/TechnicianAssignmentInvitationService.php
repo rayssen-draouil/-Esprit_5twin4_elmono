@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Maintenance;
 use App\Models\MaintenanceAssignmentInvitation;
 use App\Models\User;
+use App\Notifications\MaintenanceStatusNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -70,7 +71,7 @@ class TechnicianAssignmentInvitationService
                 ];
             }
 
-            if (empty($technician->email) || !filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
+            if (empty($technician->email) || ! filter_var($technician->email, FILTER_VALIDATE_EMAIL)) {
                 return [
                     'success' => false,
                     'invitation' => null,
@@ -202,7 +203,7 @@ class TechnicianAssignmentInvitationService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$invitation) {
+            if (! $invitation) {
                 return [
                     'success' => false,
                     'message' => "Jeton d'invitation introuvable ou invalide.",
@@ -212,6 +213,7 @@ class TechnicianAssignmentInvitationService
 
             if ($invitation->hasExpired()) {
                 $invitation->update(['status' => MaintenanceAssignmentInvitation::STATUS_EXPIRED]);
+
                 return [
                     'success' => false,
                     'message' => "Cette invitation d'intervention a expiré.",
@@ -223,7 +225,7 @@ class TechnicianAssignmentInvitationService
                 // Idempotent: already accepted by this technician
                 return [
                     'success' => true,
-                    'message' => "Vous avez déjà accepté cette intervention auparavant.",
+                    'message' => 'Vous avez déjà accepté cette intervention auparavant.',
                     'maintenance' => $invitation->maintenance,
                 ];
             }
@@ -243,7 +245,7 @@ class TechnicianAssignmentInvitationService
             if ($maintenance->technician_assignment_locked && (int) $maintenance->technician_id !== (int) $technician->id) {
                 return [
                     'success' => false,
-                    'message' => "Cette intervention a déjà été acceptée et affectée à un autre technicien.",
+                    'message' => 'Cette intervention a déjà été acceptée et affectée à un autre technicien.',
                     'maintenance' => null,
                 ];
             }
@@ -294,15 +296,15 @@ class TechnicianAssignmentInvitationService
 
             foreach ($managers as $mgr) {
                 try {
-                    $mgr->notify(new \App\Notifications\MaintenanceStatusNotification($maintenance, 'accepted', $technician));
+                    $mgr->notify(new MaintenanceStatusNotification($maintenance, 'accepted', $technician));
                 } catch (\Throwable $e) {
-                    Log::warning('Failed sending in-app notification for accepted maintenance: ' . $e->getMessage());
+                    Log::warning('Failed sending in-app notification for accepted maintenance: '.$e->getMessage());
                 }
 
                 try {
                     $this->brevoService->sendTechnicianAcceptedNotificationToManager($maintenance, $technician, $mgr);
                 } catch (\Throwable $e) {
-                    Log::warning('Failed sending email to manager on technician acceptance: ' . $e->getMessage());
+                    Log::warning('Failed sending email to manager on technician acceptance: '.$e->getMessage());
                 }
             }
 
@@ -334,7 +336,7 @@ class TechnicianAssignmentInvitationService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$invitation) {
+            if (! $invitation) {
                 return [
                     'success' => false,
                     'message' => "Jeton d'invitation introuvable.",
@@ -355,7 +357,7 @@ class TechnicianAssignmentInvitationService
 
             // Clear proposed technician if assignment was not locked
             $maintenance = Maintenance::find($invitation->maintenance_id);
-            if ($maintenance && !$maintenance->technician_assignment_locked) {
+            if ($maintenance && ! $maintenance->technician_assignment_locked) {
                 $maintenance->technician_id = null;
                 $maintenance->save();
             }

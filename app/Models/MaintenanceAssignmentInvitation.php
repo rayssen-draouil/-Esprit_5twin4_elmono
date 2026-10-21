@@ -11,9 +11,13 @@ class MaintenanceAssignmentInvitation extends Model
     use HasFactory;
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_ACCEPTED = 'accepted';
+
     public const STATUS_DECLINED = 'declined';
+
     public const STATUS_EXPIRED = 'expired';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
@@ -67,7 +71,7 @@ class MaintenanceAssignmentInvitation extends Model
 
     public function isPending(): bool
     {
-        return $this->status === self::STATUS_PENDING && !$this->hasExpired();
+        return $this->status === self::STATUS_PENDING && ! $this->hasExpired();
     }
 
     public function isAccepted(): bool

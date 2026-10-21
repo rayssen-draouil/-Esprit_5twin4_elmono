@@ -210,7 +210,7 @@ class InfrastructureController extends Controller
         $filters = [];
 
         if ($request->filled('search')) {
-            $filters['search'] = ['label' => 'Recherche : ' . $request->input('search'), 'param' => 'search'];
+            $filters['search'] = ['label' => 'Recherche : '.$request->input('search'), 'param' => 'search'];
         }
         if ($request->filled('quick')) {
             $labels = [
@@ -223,23 +223,23 @@ class InfrastructureController extends Controller
                 $filters['quick'] = ['label' => $labels[$request->input('quick')], 'param' => 'quick'];
             }
         }
-        if ($request->filled('status') && !$request->filled('quick')) {
-            $filters['status'] = ['label' => 'Statut : ' . ucfirst($request->input('status')), 'param' => 'status'];
+        if ($request->filled('status') && ! $request->filled('quick')) {
+            $filters['status'] = ['label' => 'Statut : '.ucfirst($request->input('status')), 'param' => 'status'];
         }
         if ($request->filled('type')) {
-            $filters['type'] = ['label' => 'Type : ' . $request->input('type'), 'param' => 'type'];
+            $filters['type'] = ['label' => 'Type : '.$request->input('type'), 'param' => 'type'];
         }
         if ($request->filled('zone_id')) {
             $zone = Zone::find($request->input('zone_id'));
             if ($zone) {
-                $filters['zone_id'] = ['label' => 'Zone : ' . $zone->name, 'param' => 'zone_id'];
+                $filters['zone_id'] = ['label' => 'Zone : '.$zone->name, 'param' => 'zone_id'];
             }
         }
         if ($request->filled('condition')) {
-            $filters['condition'] = ['label' => 'Condition : ' . ucfirst($request->input('condition')), 'param' => 'condition'];
+            $filters['condition'] = ['label' => 'Condition : '.ucfirst($request->input('condition')), 'param' => 'condition'];
         }
         if ($request->filled('criticality')) {
-            $filters['criticality'] = ['label' => 'Criticité : ' . ucfirst($request->input('criticality')), 'param' => 'criticality'];
+            $filters['criticality'] = ['label' => 'Criticité : '.ucfirst($request->input('criticality')), 'param' => 'criticality'];
         }
 
         return $filters;

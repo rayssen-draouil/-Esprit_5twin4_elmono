@@ -188,7 +188,7 @@ class InfrastructureMaintenanceSeeder extends Seeder
         );
 
         // 4. Tunisian Maintenances (Technical operations & Citizen Malfunction Reports)
-        
+
         // Operation 1 - Completed (Ghdir El Golla)
         Maintenance::updateOrCreate(
             ['reference_code' => 'MNT-2026-TUN-001'],

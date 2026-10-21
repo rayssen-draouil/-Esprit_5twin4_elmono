@@ -57,7 +57,7 @@ class ChatTools
             'type' => 'integer',
             'minimum' => 1,
             'maximum' => self::PERIOD_MAX,
-            'description' => "Fenêtre temporelle en jours (1 à 90, ex. 7 = derniers 7 jours).",
+            'description' => 'Fenêtre temporelle en jours (1 à 90, ex. 7 = derniers 7 jours).',
         ];
 
         $limit = [
@@ -69,7 +69,7 @@ class ChatTools
 
         $zone = [
             'type' => ['string', 'integer'],
-            'description' => "Nom ou identifiant de la zone AquaSecure (le nom peut être approché, ex. « tunis »).",
+            'description' => 'Nom ou identifiant de la zone AquaSecure (le nom peut être approché, ex. « tunis »).',
         ];
 
         $severity = [
@@ -106,19 +106,19 @@ class ChatTools
             ),
             $def(
                 'get_alerts',
-                "Liste les alertes AquaSecure récentes, filtrables par zone, période (jours) et gravité.",
+                'Liste les alertes AquaSecure récentes, filtrables par zone, période (jours) et gravité.',
                 ['zone' => $zone, 'period_days' => $period, 'severity' => $severity, 'limit' => $limit],
                 []
             ),
             $def(
                 'count_alerts',
-                "Compte les alertes AquaSecure (filtres zone / période / gravité) avec répartition par gravité.",
+                'Compte les alertes AquaSecure (filtres zone / période / gravité) avec répartition par gravité.',
                 ['zone' => $zone, 'period_days' => $period, 'severity' => $severity],
                 []
             ),
             $def(
                 'get_priority_alerts',
-                "Retourne les alertes prioritaires (gravité élevée + récence), classées par score de priorité.",
+                'Retourne les alertes prioritaires (gravité élevée + récence), classées par score de priorité.',
                 ['limit' => $limit],
                 []
             ),

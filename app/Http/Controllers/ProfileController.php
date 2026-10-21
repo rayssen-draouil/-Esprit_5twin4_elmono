@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateProfileRequest;
-use Illuminate\Http\Request;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -67,7 +68,7 @@ class ProfileController extends Controller
     {
         $request->validate(['password' => ['required', 'current_password']]);
         $user = $request->user();
-        if ($user->role === 'admin' && \App\Models\User::where('role', 'admin')->count() <= 1) {
+        if ($user->role === 'admin' && User::where('role', 'admin')->count() <= 1) {
             return back()->withErrors(['password' => 'Le dernier administrateur ne peut pas supprimer son compte.']);
         }
         if ($user->profile_photo_path) {

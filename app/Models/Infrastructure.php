@@ -148,15 +148,23 @@ class Infrastructure extends Model
         }
 
         $score = $base + $conditionMod + $overdueMod;
+
         return max(5, min(100, $score));
     }
 
     public function getHealthLabelAttribute(): string
     {
         $score = $this->health_score;
-        if ($score >= 85) return 'Excellent';
-        if ($score >= 70) return 'Bon état';
-        if ($score >= 50) return 'Surveillance';
+        if ($score >= 85) {
+            return 'Excellent';
+        }
+        if ($score >= 70) {
+            return 'Bon état';
+        }
+        if ($score >= 50) {
+            return 'Surveillance';
+        }
+
         return 'Critique';
     }
 
@@ -217,7 +225,7 @@ class Infrastructure extends Model
 
     public function getIsMaintenanceDueSoonAttribute(): bool
     {
-        if (!$this->next_maintenance_date) {
+        if (! $this->next_maintenance_date) {
             return false;
         }
 
@@ -226,7 +234,7 @@ class Infrastructure extends Model
 
     public function getIsMaintenanceOverdueAttribute(): bool
     {
-        if (!$this->next_maintenance_date) {
+        if (! $this->next_maintenance_date) {
             return false;
         }
 

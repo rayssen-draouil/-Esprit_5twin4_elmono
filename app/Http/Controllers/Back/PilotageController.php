@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\DecisionHistory;
 use App\Models\Financement;
 use App\Models\Project;
-use App\Models\User;
 use App\Services\FinancementCoverageService;
 use App\Services\ProjectFinancialService;
 use Illuminate\Http\Request;
@@ -69,9 +68,10 @@ class PilotageController extends Controller
         $projectsByValidation = $projects->groupBy('validation_status')->map(fn ($group) => $group->count())->all();
 
         // Projets sous-financés (detail)
-        $underfundedProjects = $projects->filter(function ($project) use ($budgetTotal) {
+        $underfundedProjects = $projects->filter(function ($project) {
             $budget = ProjectFinancialService::getRevisedBudget($project);
             $confirmed = ProjectFinancialService::getConfirmedFunding($project);
+
             return $budget > 0 && $confirmed < $budget;
         })->values()->take(10);
 
@@ -86,9 +86,9 @@ class PilotageController extends Controller
         /* ============================================================
            Vue Financements
            ============================================================ */
-$montantsApprouves = $financements->where('validation_status', 'approved')->sum('amount');
-$montantsRejetes = $financements->where('validation_status', 'rejected')->sum('amount');
-$financementsPendingAmount = $financements->where('validation_status', 'pending_approval')->sum('amount');
+        $montantsApprouves = $financements->where('validation_status', 'approved')->sum('amount');
+        $montantsRejetes = $financements->where('validation_status', 'rejected')->sum('amount');
+        $financementsPendingAmount = $financements->where('validation_status', 'pending_approval')->sum('amount');
 
         // Répartition des alertes financières (niveaus de couverture par financement pending)
         $alertDistribution = [
@@ -130,9 +130,10 @@ $financementsPendingAmount = $financements->where('validation_status', 'pending_
 
         // Demandes anciennes (plus de 7 jours en attente)
         $oldPendingValidations = array_filter($pendingValidations, function ($item) {
-            if (!$item['submitted_at']) {
+            if (! $item['submitted_at']) {
                 return false;
             }
+
             return $item['submitted_at'] < now()->subDays(7);
         });
 
@@ -280,6 +281,7 @@ $financementsPendingAmount = $financements->where('validation_status', 'pending_
     private function getLastSubmitDate($decisionHistories): ?string
     {
         $submit = $decisionHistories->where('action_type', 'submit')->last();
+
         return $submit ? $submit->created_at->toISOString() : null;
     }
 
@@ -317,7 +319,7 @@ $financementsPendingAmount = $financements->where('validation_status', 'pending_
     {
         // Trouver la dernière décision (approve ou reject)
         $decision = $decisionHistories->whereIn('action_type', ['approve', 'reject'])->last();
-        if (!$decision) {
+        if (! $decision) {
             return null;
         }
 
@@ -327,7 +329,7 @@ $financementsPendingAmount = $financements->where('validation_status', 'pending_
             ->where('created_at', '<', $decision->created_at)
             ->last();
 
-        if (!$submit) {
+        if (! $submit) {
             return null;
         }
 
@@ -350,7 +352,7 @@ $financementsPendingAmount = $financements->where('validation_status', 'pending_
                 $alerts[] = [
                     'type' => 'budget_exceeded',
                     'title' => "Dépassement budgétaire : {$project->name}",
-                    'description' => "Dépenses engagées (" . number_format($engaged, 0, ',', ' ') . " €) supérieures au budget (" . number_format($budget, 0, ',', ' ') . " €).",
+                    'description' => 'Dépenses engagées ('.number_format($engaged, 0, ',', ' ').' €) supérieures au budget ('.number_format($budget, 0, ',', ' ').' €).',
                     'url' => route('projects.show', $project),
                 ];
             }
@@ -360,7 +362,7 @@ $financementsPendingAmount = $financements->where('validation_status', 'pending_
                 $alerts[] = [
                     'type' => 'insufficient_funding',
                     'title' => "Sous-financement : {$project->name}",
-                    'description' => "Financement confirmé (" . number_format($confirmed, 0, ',', ' ') . " €) inférieur au budget (" . number_format($budget, 0, ',', ' ') . " €). Reste : " . number_format($deficit, 0, ',', ' ') . " €.",
+                    'description' => 'Financement confirmé ('.number_format($confirmed, 0, ',', ' ').' €) inférieur au budget ('.number_format($budget, 0, ',', ' ').' €). Reste : '.number_format($deficit, 0, ',', ' ').' €.',
                     'url' => route('projects.show', $project),
                 ];
             }

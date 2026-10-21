@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
 
@@ -36,7 +37,8 @@ class EmailVerificationController extends Controller
         try {
             $request->user()->sendEmailVerificationNotification();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to resend verification email: ' . $e->getMessage());
+            Log::error('Failed to resend verification email: '.$e->getMessage());
+
             return back()->withErrors(['email' => "Impossible d'envoyer l'e-mail pour le moment. Veuillez réessayer plus tard."]);
         }
 

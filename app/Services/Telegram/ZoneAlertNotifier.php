@@ -6,6 +6,7 @@ use App\Models\Alert;
 use App\Models\User;
 use App\Models\UserZoneSubscription;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -81,7 +82,7 @@ class ZoneAlertNotifier
         $zone = $alert->zone?->name ?? 'Zone non définie';
         $type = $alert->type ?: 'Alerte réseau';
         $severity = $alert->severity_label;
-        $summary = \Illuminate\Support\Str::limit((string) $alert->message, 300);
+        $summary = Str::limit((string) $alert->message, 300);
         $url = route('front.alerts.show', $alert);
 
         return "🚨 <b>Alerte AquaSecure</b>\n"

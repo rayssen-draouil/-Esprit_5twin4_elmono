@@ -23,10 +23,10 @@ class EquipementController extends Controller
                     ->orWhere('status', 'like', '%'.$search.'%');
             }))
             ->with([
-            'interventions' => fn ($query) => $query
-                ->with('technician')
-                ->whereNotIn('interventions.status', ['completed', 'cancelled'])
-                ->orderBy('interventions.scheduled_at'),
+                'interventions' => fn ($query) => $query
+                    ->with('technician')
+                    ->whereNotIn('interventions.status', ['completed', 'cancelled'])
+                    ->orderBy('interventions.scheduled_at'),
             ])
             ->orderBy('name')
             ->paginate(10)

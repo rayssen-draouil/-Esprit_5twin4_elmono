@@ -28,7 +28,7 @@ class TechnicienController extends Controller
                 'interventions as is_on_intervention' => fn ($query) => $query->where('status', 'in_progress'),
             ])
             ->when($request->filled('search'), function ($query) use ($request) {
-                $search = '%' . $request->input('search') . '%';
+                $search = '%'.$request->input('search').'%';
                 $query->where(function ($builder) use ($search) {
                     $builder->where('name', 'like', $search)
                         ->orWhere('email', 'like', $search)
@@ -70,7 +70,7 @@ class TechnicienController extends Controller
     {
         $validated = $request->validate($this->rules());
 
-        $technician = new User();
+        $technician = new User;
         $technician->fill($validated);
         $technician->role = 'technician';
         $technician->password = $validated['password'] ?? User::DEFAULT_PASSWORD;
