@@ -6,7 +6,6 @@ use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\Signalement;
 use App\Models\User;
-use App\Models\Zone;
 use Database\Seeders\InfrastructureMaintenanceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -78,7 +77,7 @@ class AiIntelligenceSuiteTest extends TestCase
                                         'explanation' => 'Aucune révision n\'a été consignée récemment.',
                                         'evidence' => 'Date de dernière révision inconnue',
                                         'urgency' => 'Sous 15 jours',
-                                    ]
+                                    ],
                                 ],
                                 'recommended_actions' => [
                                     [
@@ -86,11 +85,11 @@ class AiIntelligenceSuiteTest extends TestCase
                                         'reason' => 'Éviter les pertes en eau',
                                         'suggested_urgency' => 'Normale',
                                         'review_level' => 'Technicien',
-                                    ]
+                                    ],
                                 ],
                                 'maintenance_checklist' => [
                                     'Contrôle des vannes',
-                                    'Vérification des capteurs de niveau'
+                                    'Vérification des capteurs de niveau',
                                 ],
                                 'missing_information' => ['Historique complet des coûts'],
                                 'maintenance_recommended' => true,
@@ -280,7 +279,7 @@ class AiIntelligenceSuiteTest extends TestCase
             'phone' => '+216 71 100 200',
             'speciality' => 'Électromécanique et Pompage',
             'status' => 'available',
-            ]);
+        ]);
 
         $techInactive = User::factory()->create([
             'role' => 'technician',
@@ -289,7 +288,7 @@ class AiIntelligenceSuiteTest extends TestCase
             'phone' => '+216 71 100 300',
             'speciality' => 'Électromécanique et Pompage',
             'status' => 'inactive',
-            ]);
+        ]);
 
         $infra = Infrastructure::first();
 

@@ -16,12 +16,19 @@ class TechnicianAssignmentLifecycleTest extends TestCase
     use RefreshDatabase;
 
     protected User $manager;
+
     protected User $technicianUser;
+
     protected User $citizen;
+
     protected User $technician;
+
     protected User $technician2;
+
     protected Zone $zone;
+
     protected Infrastructure $infrastructure;
+
     protected Maintenance $maintenance;
 
     protected function setUp(): void

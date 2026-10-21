@@ -29,6 +29,7 @@ use App\Http\Controllers\Technician\TechnicianInterventionController;
 use App\Http\Controllers\TechnicienController;
 use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UserController;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -44,7 +45,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 Route::bind('technicien', function ($value) {
-    return \App\Models\User::where('id', $value)
+    return User::where('id', $value)
         ->where(function ($query) {
             $query->where('role', 'technician')
                 ->orWhereHas('maintenances')

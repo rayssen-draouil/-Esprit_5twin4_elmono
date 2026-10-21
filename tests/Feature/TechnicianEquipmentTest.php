@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Equipement;
 use App\Models\Incident;
 use App\Models\Intervention;
+use App\Models\Technicien;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -92,7 +93,7 @@ class TechnicianEquipmentTest extends TestCase
     {
         $manager = User::factory()->create(['role' => 'manager']);
         $technicianUser = User::factory()->create(['role' => 'technician']);
-        $technician = \App\Models\Technicien::create([
+        $technician = Technicien::create([
             'user_id' => $technicianUser->id,
             'name' => $technicianUser->name,
             'email' => $technicianUser->email,

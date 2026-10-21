@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
 use App\Models\User;
-use App\Models\Zone;
 use Database\Seeders\InfrastructureMaintenanceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -279,5 +278,3 @@ class MaintenanceTest extends TestCase
             ->assertSee('AI TECHNICIAN MATCHMAKER');
     }
 }
-
-

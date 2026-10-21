@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\DecisionHistory;
 use App\Models\Financement;
 use App\Models\Project;
 use App\Models\User;

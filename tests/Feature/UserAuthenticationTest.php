@@ -60,7 +60,7 @@ class UserAuthenticationTest extends TestCase
     public function test_valid_signed_verification_link_marks_email_as_verified(): void
     {
         $user = User::factory()->create(['email_verified_at' => null]);
-        $verificationUrl = (new VerifyEmail())->toMail($user)->actionUrl;
+        $verificationUrl = (new VerifyEmail)->toMail($user)->actionUrl;
 
         $this->actingAs($user)
             ->get($verificationUrl)

@@ -68,9 +68,10 @@ Le workflow CD est un garde-fou inactif : il attend une CI réussie sur `main`, 
 ## Limites et résultats de validation
 
 - La suite Laravel contient des échecs préexistants. La migration `2026_10_18_000000_align_technician_profiles_on_users_table.php` supprime `techniciens` alors que la migration `2026_10_20_000007_consolidate_technicians_into_users.php` doit encore migrer des références ; le seeder échoue avec une clé étrangère vers la table supprimée. Il faut corriger le schéma avant d'attendre une CI verte.
-- `vendor/bin/pint --test` échoue sur de nombreux fichiers PHP déjà présents.
+- Le formatage Pint a été appliqué aux fichiers PHP du dépôt ; `vendor/bin/pint --test` passe désormais localement.
 - Le test Ollama attend un modèle installé et le test de réinitialisation mot de passe attend une notification Laravel alors que le modèle utilise directement Brevo.
 - Le poste d'exécution n'a pas pu accéder au moteur Docker Desktop (permission refusée sur le pipe), donc les images n'ont pas été construites ici. La CI GitHub fera les builds.
 - Le scanner SonarQube n'est pas installé localement ; son job dépend de la variable et du secret ci-dessus.
-- `composer audit` n'a pas pu joindre Packagist depuis l'environnement réseau restreint. `npm ci` a échoué avec `EPERM` sous Windows, donc le build Vite doit être confirmé dans GitHub Actions.
-- Validations précédentes : YAML des workflows valide ; `composer validate --no-check-publish` valide avec un avertissement de contrainte Fortify ; 6 tests Flask et 28 tests `ProjectDoctorTest` réussis. Le test de réinitialisation ciblé et Pint restent en échec comme décrit.
+- Le verrou npm a été mis à jour avec `npm audit fix` ; Vite est verrouillé en version 6.4.5. `npm audit --audit-level=high` passe et trouve zéro vulnérabilité.
+- `composer audit` n'a pas pu joindre Packagist depuis l'environnement réseau restreint. Le build Vite local échoue encore avec `spawn EPERM` sous Windows, donc le build doit être confirmé dans GitHub Actions.
+- Validations précédentes : YAML des workflows valide ; `composer validate --no-check-publish` valide avec un avertissement de contrainte Fortify ; 6 tests Flask et 28 tests `ProjectDoctorTest` réussis. `vendor/bin/pint --test` passe après formatage du code existant. Le test de réinitialisation ciblé reste en échec comme décrit.

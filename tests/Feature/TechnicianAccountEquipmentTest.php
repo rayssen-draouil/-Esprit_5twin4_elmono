@@ -2,15 +2,16 @@
 
 namespace Tests\Feature;
 
-use App\Models\Incident;
 use App\Models\Equipement;
+use App\Models\Incident;
 use App\Models\Intervention;
 use App\Models\Technicien;
 use App\Models\User;
+use App\Services\InterventionSchedulingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class TechnicianAccountEquipmentTest extends TestCase
@@ -101,7 +102,7 @@ class TechnicianAccountEquipmentTest extends TestCase
         ]);
         $this->assertCount(
             1,
-            app(\App\Services\InterventionSchedulingService::class)->conflicts(
+            app(InterventionSchedulingService::class)->conflicts(
                 $technician->id,
                 now()->addDays(4)->format('Y-m-d H:i:s'),
                 60,
@@ -115,14 +116,14 @@ class TechnicianAccountEquipmentTest extends TestCase
             ->assertJsonPath('message', 'Ce technicien est déjà affecté à une autre intervention en cours. Il doit la terminer avant d’en recevoir une autre.');
 
         $this->post(route('interventions.store'), [
-                'incident_id' => Incident::factory()->create()->id,
-                'technician_id' => $technician->id,
-                'team' => 'Nouvelle affectation',
-                'scheduled_at' => now()->addDays(4)->format('Y-m-d H:i:s'),
-                'scheduled_duration_minutes' => 60,
-                'priority' => 'medium',
-                'status' => 'planned',
-            ])
+            'incident_id' => Incident::factory()->create()->id,
+            'technician_id' => $technician->id,
+            'team' => 'Nouvelle affectation',
+            'scheduled_at' => now()->addDays(4)->format('Y-m-d H:i:s'),
+            'scheduled_duration_minutes' => 60,
+            'priority' => 'medium',
+            'status' => 'planned',
+        ])
             ->assertSessionHasErrors([
                 'scheduled_at' => 'Ce technicien est déjà affecté à une autre intervention en cours. Il doit la terminer avant d’en recevoir une autre.',
             ]);
@@ -270,11 +271,11 @@ class TechnicianAccountEquipmentTest extends TestCase
                 'content' => [[
                     'type' => 'text',
                     'text' => json_encode([
-                            'recommendations' => [
-                                ['equipment_id' => $busyEquipment->id, 'reason' => 'Matériel indisponible.'],
-                                ['equipment_id' => $availableEquipment->id, 'reason' => 'Détection adaptée à la fuite.'],
-                            ],
-                        ]),
+                        'recommendations' => [
+                            ['equipment_id' => $busyEquipment->id, 'reason' => 'Matériel indisponible.'],
+                            ['equipment_id' => $availableEquipment->id, 'reason' => 'Détection adaptée à la fuite.'],
+                        ],
+                    ]),
                 ]],
             ]),
         ]);
@@ -913,8 +914,8 @@ class TechnicianAccountEquipmentTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('technicien.interventions.respond', $intervention), [
-            'response' => 'refused',
-        ])->assertSessionHas('error');
+                'response' => 'refused',
+            ])->assertSessionHas('error');
     }
 
     public function test_expired_in_progress_interventions_are_completed_by_the_scheduled_command(): void

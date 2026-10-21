@@ -2,10 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Incident;
 use App\Models\Infrastructure;
 use App\Models\Maintenance;
-use App\Models\MaintenanceIntelligenceScan;
 use App\Models\User;
 use App\Models\Zone;
 use Database\Seeders\InfrastructureMaintenanceSeeder;
@@ -188,8 +186,8 @@ class MaintenanceIntelligenceTest extends TestCase
                                         'recommended_timeframe' => 'Sous 48 heures',
                                         'missing_information' => [],
                                         'planning_recommended' => true,
-                                    ]
-                                ]
+                                    ],
+                                ],
                             ]),
                         ],
                     ],

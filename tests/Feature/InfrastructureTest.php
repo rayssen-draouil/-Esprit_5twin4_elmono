@@ -299,5 +299,3 @@ class InfrastructureTest extends TestCase
         $response->assertSee('validation-feedback');
     }
 }
-
-
