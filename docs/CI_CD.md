@@ -67,7 +67,8 @@ Le workflow CD est un garde-fou inactif : il attend une CI réussie sur `main`, 
 
 ## Limites et résultats de validation
 
-- La suite Laravel contient des échecs préexistants. La migration `2026_10_18_000000_align_technician_profiles_on_users_table.php` supprime `techniciens` alors que la migration `2026_10_20_000007_consolidate_technicians_into_users.php` doit encore migrer des références ; le seeder échoue avec une clé étrangère vers la table supprimée. Il faut corriger le schéma avant d'attendre une CI verte.
+- Les migrations `2026_10_18_000000_align_technician_profiles_on_users_table.php` et `2026_10_20_000007_consolidate_technicians_into_users.php` ont été corrigées pour conserver la table de profils tant que le code applicatif l'utilise, et pour ne remapper les clés qu'après copie des profils. Les suites liées aux infrastructures, maintenances, recommandations IA, pagination et pilotage passent désormais.
+- La suite complète garde des échecs indépendants de ce correctif, notamment le statut Ollama attendu par `AiChatTest`, certaines fonctions technicien qui ne correspondent pas encore à la consolidation des comptes, et l'envoi du mail de réinitialisation via Brevo au lieu de la notification Laravel attendue.
 - Le formatage Pint a été appliqué aux fichiers PHP du dépôt ; `vendor/bin/pint --test` passe désormais localement.
 - Le test Ollama attend un modèle installé et le test de réinitialisation mot de passe attend une notification Laravel alors que le modèle utilise directement Brevo.
 - Le poste d'exécution n'a pas pu accéder au moteur Docker Desktop (permission refusée sur le pipe), donc les images n'ont pas été construites ici. La CI GitHub fera les builds.

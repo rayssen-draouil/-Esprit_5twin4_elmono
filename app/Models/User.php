@@ -41,6 +41,10 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public const DEFAULT_PASSWORD = 'password123';
 
+    public const TECHNICIAN_APPROVAL_APPROVED = 'approved';
+
+    public const TECHNICIAN_APPROVAL_PENDING = 'pending';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -51,6 +55,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'role',
+        'technician_approval_status',
         'phone',
         'speciality',
         'skills',

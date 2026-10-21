@@ -40,7 +40,9 @@ return new class extends Migration
         $this->remapTechnicianIds($idMap);
         $this->createUserForeignKeys();
 
-        Schema::dropIfExists('techniciens');
+        // Keep the technician profile table while the application still reads
+        // and writes it. The account/profile consolidation is not a deletion
+        // of the legacy directory model.
     }
 
     /**
@@ -116,6 +118,12 @@ return new class extends Migration
         Schema::table('maintenance_assignment_invitations', function (Blueprint $table) {
             $table->dropForeign(['technician_id']);
         });
+
+        if (Schema::hasTable('equipements') && Schema::hasColumn('equipements', 'technicien_id')) {
+            Schema::table('equipements', function (Blueprint $table) {
+                $table->dropForeign(['technicien_id']);
+            });
+        }
     }
 
     /**
@@ -148,6 +156,13 @@ return new class extends Migration
                 array_merge($bindings, array_keys($idMap))
             );
         }
+
+        if (Schema::hasTable('equipements') && Schema::hasColumn('equipements', 'technicien_id')) {
+            DB::statement(
+                'UPDATE equipements SET technicien_id = '.$caseSql.' WHERE technicien_id IN ('.implode(', ', $placeholders).')',
+                array_merge($bindings, array_keys($idMap))
+            );
+        }
     }
 
     /**
@@ -166,6 +181,12 @@ return new class extends Migration
         Schema::table('maintenance_assignment_invitations', function (Blueprint $table) {
             $table->foreign('technician_id')->references('id')->on('users')->cascadeOnDelete();
         });
+
+        if (Schema::hasTable('equipements') && Schema::hasColumn('equipements', 'technicien_id')) {
+            Schema::table('equipements', function (Blueprint $table) {
+                $table->foreign('technicien_id')->references('id')->on('users')->nullOnDelete();
+            });
+        }
     }
 
     public function down(): void

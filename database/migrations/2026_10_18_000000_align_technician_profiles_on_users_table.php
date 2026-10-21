@@ -28,33 +28,13 @@ return new class extends Migration
             });
         }
 
-        if (Schema::hasTable('equipements') && Schema::hasColumn('equipements', 'technicien_id')) {
-            Schema::table('equipements', function (Blueprint $table) {
-                $table->dropForeign(['technicien_id']);
-                $table->unsignedBigInteger('technicien_id')->nullable()->change();
-                $table->foreign('technicien_id')
-                    ->references('id')
-                    ->on('users')
-                    ->nullOnDelete();
-            });
-        }
-
-        Schema::dropIfExists('techniciens');
     }
 
     public function down(): void
     {
-        if (! Schema::hasTable('techniciens')) {
-            Schema::create('techniciens', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
-                $table->string('name');
-                $table->string('email')->nullable();
-                $table->string('phone')->nullable();
-                $table->string('speciality')->nullable();
-                $table->text('skills')->nullable();
-                $table->string('status')->default('available');
-                $table->timestamps();
+        if (Schema::hasColumn('users', 'skills')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropColumn('skills');
             });
         }
     }

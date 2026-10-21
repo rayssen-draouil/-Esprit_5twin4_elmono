@@ -8,6 +8,7 @@ use App\Http\Controllers\Back\AlertController;
 use App\Http\Controllers\Back\BackController;
 use App\Http\Controllers\Back\FinancialDashboardController;
 use App\Http\Controllers\Back\MaintenanceIntelligenceController;
+use App\Http\Controllers\Back\PilotageController;
 use App\Http\Controllers\Back\ZoneAiController;
 use App\Http\Controllers\Back\ZoneController;
 use App\Http\Controllers\DashboardController;
@@ -112,6 +113,7 @@ Route::middleware('auth')->group(function () {
 Route::get('/', [FrontController::class, 'home'])->name('home');
 Route::get('/about', [FrontController::class, 'about'])->name('front.about');
 Route::get('/services', [FrontController::class, 'services'])->name('front.services');
+Route::get('/operations', [FrontController::class, 'operations'])->name('front.operations');
 Route::get('/zones', [FrontController::class, 'zones'])->name('front.zones.index');
 Route::get('/alerts', [FrontController::class, 'alerts'])->name('front.alerts.index');
 Route::get('/alertes', [FrontController::class, 'alerts']);

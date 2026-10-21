@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Front;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ReportMalfunctionRequest;
 use App\Models\Alert;
+use App\Models\Equipement;
 use App\Models\Financement;
 use App\Models\Incident;
 use App\Models\Infrastructure;
+use App\Models\Intervention;
 use App\Models\Maintenance;
 use App\Models\Project;
 use App\Models\Signalement;
+use App\Models\Technicien;
 use App\Models\Zone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -86,6 +89,58 @@ class FrontController extends Controller
     public function services(): View
     {
         return view('front.services', $this->shared());
+    }
+
+    public function operations(): View
+    {
+        $periodStart = now()->subDays(30)->startOfDay();
+        $periodEnd = now();
+        $recent = Intervention::query()
+            ->whereBetween('created_at', [$periodStart, $periodEnd]);
+
+        $statuses = [
+            'planned' => ['PlanifiÃ©es', 'Interventions planifiÃ©es au cours des 30 derniers jours.'],
+            'in_progress' => ['En cours', 'Interventions commencÃ©es au cours des 30 derniers jours.'],
+            'completed' => ['TerminÃ©es', 'Interventions terminÃ©es au cours des 30 derniers jours.'],
+        ];
+
+        $operationStatuses = collect($statuses)->map(fn ($copy, $key) => [
+            'key' => $key,
+            'label' => $copy[0],
+            'description' => $copy[1],
+            'count' => (clone $recent)->where('status', $key)->count(),
+        ])->values();
+
+        $specialties = Technicien::query()
+            ->whereHas('user', fn ($query) => $query
+                ->where('role', 'technician')
+                ->where('technician_approval_status', 'approved'))
+            ->whereNotNull('speciality')
+            ->where('speciality', '!=', '')
+            ->distinct()
+            ->orderBy('speciality')
+            ->pluck('speciality');
+
+        $images = [
+            'DÃ©tection acoustique' => 'DÃ©tecteur acoustique de fuites.webp',
+            'Coupure et raccordement de canalisation' => 'Vanne de coupure DN50.webp',
+        ];
+        $equipmentTypes = Equipement::query()
+            ->whereNotNull('type')
+            ->where('type', '!=', '')
+            ->distinct()
+            ->orderBy('type')
+            ->pluck('type')
+            ->map(fn ($type) => ['name' => $type, 'image' => $images[$type] ?? null]);
+
+        return view('front.operations', $this->shared() + [
+            'operationStatuses' => $operationStatuses,
+            'periodStart' => $periodStart,
+            'periodEnd' => $periodEnd,
+            'activeInterventionsCount' => Intervention::query()->where('status', 'in_progress')->count(),
+            'specialties' => $specialties,
+            'equipmentTypes' => $equipmentTypes,
+        ]);
     }
 
     public function projects(): View
