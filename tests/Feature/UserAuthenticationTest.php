@@ -3,10 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Services\BrevoEmailService;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Fortify;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
@@ -23,7 +22,12 @@ class UserAuthenticationTest extends TestCase
 
     public function test_public_registration_always_creates_a_citizen_and_sends_verification(): void
     {
-        Notification::fake();
+        $brevo = \Mockery::mock(BrevoEmailService::class);
+        $brevo->shouldReceive('sendEmailVerificationNotification')
+            ->once()
+            ->with(\Mockery::on(fn (User $user): bool => $user->email === 'new@example.test'))
+            ->andReturn(['success' => true, 'message_id' => 'test-verification', 'error' => null]);
+        $this->app->instance(BrevoEmailService::class, $brevo);
 
         $response = $this->post(route('register.store'), [
             'name' => 'Nouvel utilisateur',
@@ -34,20 +38,24 @@ class UserAuthenticationTest extends TestCase
         ]);
 
         $response->assertRedirect(route('verification.notice'));
+        $response->assertSessionHas('success');
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', ['email' => 'new@example.test', 'role' => 'citizen']);
-        Notification::assertSentTo(User::where('email', 'new@example.test')->first(), VerifyEmail::class);
     }
 
     public function test_password_reset_link_is_sent_without_exposing_account_existence(): void
     {
-        Notification::fake();
-        $user = User::factory()->create();
+        $brevo = \Mockery::mock(BrevoEmailService::class);
+        $brevo->shouldReceive('sendPasswordResetNotification')
+            ->once()
+            ->with(\Mockery::on(fn (User $notifiable): bool => $notifiable->email === 'reset@example.test'), \Mockery::type('string'))
+            ->andReturn(['success' => true, 'message_id' => 'test-password-reset', 'error' => null]);
+        $this->app->instance(BrevoEmailService::class, $brevo);
+        $user = User::factory()->create(['email' => 'reset@example.test']);
 
         $response = $this->post(route('password.email'), ['email' => $user->email]);
 
         $response->assertSessionHas('success');
-        Notification::assertSentTo($user, ResetPassword::class);
     }
 
     public function test_unverified_users_cannot_access_the_admin_area(): void

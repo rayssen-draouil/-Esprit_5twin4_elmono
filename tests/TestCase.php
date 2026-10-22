@@ -11,13 +11,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        // All Laravel tests run without outbound HTTP. Tests may replace this
-        // default with endpoint-specific Http::fake() responses as needed.
+        // All Laravel tests run without outbound HTTP. Each integration test
+        // defines its own response so endpoint-specific behavior is preserved.
         Http::preventStrayRequests();
-        Http::fake([
-            'https://api.brevo.com/**' => Http::response([
-                'messageId' => 'ci-test-message',
-            ], 201),
-        ]);
     }
 }

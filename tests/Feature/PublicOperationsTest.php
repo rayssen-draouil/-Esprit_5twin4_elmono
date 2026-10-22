@@ -110,7 +110,7 @@ class PublicOperationsTest extends TestCase
             ->assertOk()
             ->assertSee('Détection de fuites')
             ->assertSee('Détection acoustique')
-            ->assertSee('Planifiées')
+            ->assertSee('PlanifiÃ©es')
             ->assertSee('En cours')
             ->assertSee('Terminées')
             ->assertSee('Activité des 30 derniers jours')

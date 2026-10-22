@@ -10,6 +10,7 @@ use App\Services\AI\ChatAiService;
 use App\Services\AI\ChatTools;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -475,6 +476,7 @@ class AiChatTest extends TestCase
 
     public function test_status_endpoint_reports_online_ollama_with_installed_model(): void
     {
+        Cache::flush();
         Http::fake([
             '*/api/tags' => Http::response(['models' => [['name' => 'llama3.1:8b']]], 200),
         ]);
@@ -489,6 +491,7 @@ class AiChatTest extends TestCase
 
     public function test_status_endpoint_reports_offline_ollama(): void
     {
+        Cache::flush();
         Http::fake([
             '*/api/tags' => fn () => throw new ConnectionException('Connection refused'),
         ]);

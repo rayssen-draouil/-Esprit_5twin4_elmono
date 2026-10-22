@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Equipement;
 use App\Models\Incident;
 use App\Models\Intervention;
-use App\Models\Technicien;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -31,8 +30,9 @@ class TechnicianEquipmentTest extends TestCase
 
         $user = User::where('email', 'sarah.petit@example.com')->firstOrFail();
         $this->assertSame('technician', $user->role);
-        $this->assertDatabaseHas('techniciens', [
-            'user_id' => $user->id,
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'role' => 'technician',
             'name' => 'Sarah Petit',
             'email' => 'sarah.petit@example.com',
             'speciality' => 'Hydraulique',
@@ -92,11 +92,8 @@ class TechnicianEquipmentTest extends TestCase
     public function test_technician_with_an_in_progress_intervention_is_displayed_as_busy(): void
     {
         $manager = User::factory()->create(['role' => 'manager']);
-        $technicianUser = User::factory()->create(['role' => 'technician']);
-        $technician = Technicien::create([
-            'user_id' => $technicianUser->id,
-            'name' => $technicianUser->name,
-            'email' => $technicianUser->email,
+        $technician = User::factory()->create([
+            'role' => 'technician',
             'status' => 'available',
         ]);
         $intervention = Intervention::create([
