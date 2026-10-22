@@ -219,11 +219,12 @@ jobs:
   sonarqube:
     name: SonarQube analysis
     if: >-
-      vars.SONAR_HOST_URL != '' &&
       github.ref == 'refs/heads/main' &&
       github.event_name != 'pull_request'
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 15
+    env:
+      SONAR_HOST_URL: http://localhost:8888
     steps:
       - name: Check out full history for analysis
         uses: actions/checkout@v4
@@ -254,7 +255,6 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v7
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
         with:
           args: >-
             -Dsonar.qualitygate.wait=true

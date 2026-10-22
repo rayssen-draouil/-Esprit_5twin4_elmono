@@ -2,7 +2,7 @@
 
 ## Architecture
 
-La CI s'exécute sur les pushs et PR vers `main` ou `develop`, et manuellement. Elle vérifie Laravel/PHP, le frontend Vite, l'API Flask et construit les deux images Docker. Seuls les pushs directs/merge sur `main` publient les images sur Docker Hub, avec les tags `latest` et le SHA du commit. Le scan SonarQube s'ajoute lorsque `SONAR_HOST_URL` est configurée dans les variables GitHub.
+La CI s'exécute sur les pushs et PR vers `main` ou `develop`, et manuellement. Elle vérifie Laravel/PHP, le frontend Vite et l'API Flask, construit les deux images Docker sans les publier, et démarre le profil d'observabilité pour vérifier Prometheus et Grafana. Après une CI réussie sur `main`, le CD publie les images applicatives sur Docker Hub avec les tags `latest` et le SHA exact testé. Le scan SonarQube s'ajoute lorsque `SONAR_HOST_URL` est configurée dans les variables GitHub.
 
 ```mermaid
 flowchart TD
@@ -11,9 +11,8 @@ flowchart TD
     B --> D[Frontend: npm audit et build Vite]
     B --> E[Flask: syntaxe et tests]
     B --> F[Build des images Docker]
-    F --> N{Push sur main ?}
-    N -->|Oui| O[Publication Docker Hub]
-    N -->|Non| P[Build uniquement]
+    B --> Q[Compose: Prometheus + Grafana + probes]
+    F --> P[Build uniquement dans CI]
     B --> G{SONAR_HOST_URL configurée ?}
     G -->|Oui| H[Scan SonarQube et quality gate]
     G -->|Non| I[Scan ignoré]
@@ -21,10 +20,10 @@ flowchart TD
     D --> J
     E --> J
     F --> J
+    Q --> J
     H --> J
-    J -->|Oui| K{DEPLOY_ENABLED=true ?}
-    K -->|Oui| L[Échec explicite: cible de déploiement absente]
-    K -->|Non| M[CD inactif]
+    J -->|Oui| O[CD publie les images Docker Hub]
+    J -->|Non| M[Pas de publication]
 ```
 
 ## Docker local
@@ -43,27 +42,28 @@ Le Compose est destiné au poste local. Il ne publie pas les images et n'est pas
 
 Configurer dans **Settings → Secrets and variables → Actions** :
 
-- Variable `SONAR_HOST_URL`: URL de base du serveur SonarQube.
 - Secret `SONAR_TOKEN`: jeton d'analyse associé au projet `aquasecure`.
 
-Le job attend la qualité gate. Il est ignoré tant que l'URL est vide et ne s'exécute pas sur les PR provenant de forks, car les secrets ne leur sont pas fournis. Un runner GitHub hébergé doit pouvoir joindre l'URL SonarQube avec TLS valide. Un serveur accessible seulement sur le réseau local nécessite un runner auto-hébergé sécurisé sur ce réseau. Ne pas exposer un token à des workflows de PR non fiables.
+Le job utilise `http://localhost:8888` et tourne sur le runner auto-hébergé Windows du dépôt, uniquement pour `main` hors pull requests. Configure le secret `SONAR_TOKEN` avec un jeton d'analyse du projet `aquasecure`. Le runner doit rester démarré et avoir accès au conteneur SonarQube sur le port 8888. Les scans de pull requests sont volontairement exclus pour éviter d'exécuter du code non fiable sur le runner personnel.
 
 Le fichier `sonar-project.properties` définit les sources et exclusions. SonarQube local n'est pas automatiquement connecté à GitHub Actions.
 
 ## Publication Docker Hub
 
-Le workflow publie `aquasecure-web` et `aquasecure-classifier` dans le compte configuré, uniquement sur `push` vers `main`. Dans **Settings → Secrets and variables → Actions**, créer :
+Le workflow CD publie `aquasecure-web` et `aquasecure-classifier` dans le compte configuré après une CI réussie sur `main`. Dans **Settings → Secrets and variables → Actions**, créer :
 
 - Variable `DOCKERHUB_USERNAME`: nom du compte Docker Hub.
 - Secret `DOCKERHUB_TOKEN`: nouveau jeton Docker Hub avec le droit de pousser les images.
 
-Ne pas mettre le jeton dans `.env`, le workflow ou le dépôt. Le jeton précédemment collé dans la conversation doit être révoqué et remplacé avant de configurer le secret. Les PR et la branche `develop` ne publient aucune image.
+Ne pas mettre le jeton dans `.env`, le workflow ou le dépôt. Le jeton précédemment collé dans la conversation doit être révoqué et remplacé avant de configurer le secret. Les PR, les CI échouées et la branche `develop` ne publient aucune image.
 
 ## GitHub Actions et CD
 
 La CI utilise les outils et fichiers de verrouillage du dépôt. L'artefact `vite-build` est conservé sept jours. Aucune vraie clé API n'est fournie à la CI. `composer audit` et `npm audit` bloquent la pipeline sur leurs alertes configurées.
 
-Le workflow CD est un garde-fou inactif : il attend une CI réussie sur `main`, puis reste désactivé sauf si `DEPLOY_ENABLED=true`. Même activé, il échoue explicitement puisqu'aucune cible ni méthode de déploiement n'est définie. La publication Docker Hub par CI ne constitue pas un déploiement. Avant tout déploiement, choisir l'hébergement, ajouter les secrets minimaux, migrations, health check et retour arrière.
+Le CD s'exécute après la fin de la CI, mais ne publie que si la CI est réussie sur `main`. Il construit et pousse les deux images vers Docker Hub; il ne déploie pas l'application sur un serveur.
+
+Le job `Prometheus and Grafana stack` démarre le profil Compose `observability`, vérifie les endpoints de santé Prometheus/Grafana, puis détruit les conteneurs et volumes temporaires du runner. Les services sont également disponibles en local avec `docker compose --profile observability up --build -d`.
 
 ## Limites et résultats de validation
 
