@@ -9,7 +9,7 @@
       "id": 1,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
       "targets": [{ "expr": "probe_success", "legendFormat": "{{instance}}", "refId": "A" }],
-      "title": "Disponibilité HTTP (1 = sain)",
+      "title": "Disponibilite HTTP (1 = sain)",
       "type": "timeseries"
     },
     {
@@ -19,16 +19,56 @@
       "id": 2,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
       "targets": [{ "expr": "probe_duration_seconds", "legendFormat": "{{instance}}", "refId": "A" }],
-      "title": "Durée des sondes HTTP",
+      "title": "Duree totale des sondes HTTP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "probe_http_status_code", "legendFormat": "{{instance}}", "refId": "A" }],
+      "title": "Code de reponse HTTP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "probe_http_duration_seconds{phase=~\".+\"}", "legendFormat": "{{phase}} - {{instance}}", "refId": "A" }],
+      "title": "Latence HTTP par phase (DNS, connexion, traitement)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "min": 0, "max": 1, "decimals": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "up{job=~\"prometheus|blackbox-exporter\"}", "legendFormat": "{{job}} / {{instance}}", "refId": "A" }],
+      "title": "Disponibilite de Prometheus et Blackbox Exporter",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "scrape_duration_seconds{job=~\"prometheus|blackbox-exporter|aquasecure-http-probes\"}", "legendFormat": "{{job}} / {{instance}}", "refId": "A" }],
+      "title": "Duree de collecte Prometheus",
       "type": "timeseries"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 41,
-  "tags": ["aquasecure", "health"],
+  "tags": ["aquasecure", "health", "http", "prometheus"],
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
-  "title": "AquaSecure - santé des services",
+  "title": "AquaSecure - sante des services",
   "uid": "aquasecure-health",
-  "version": 1
+  "version": 2
 }

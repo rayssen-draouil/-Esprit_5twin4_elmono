@@ -7,6 +7,10 @@ scrape_configs:
     static_configs:
       - targets: ["prometheus:9090"]
 
+  - job_name: blackbox-exporter
+    static_configs:
+      - targets: ["blackbox:9115"]
+
   - job_name: aquasecure-http-probes
     metrics_path: /probe
     params:
