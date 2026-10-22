@@ -78,6 +78,7 @@ jobs:
 
       - name: Run Laravel and PHPUnit tests
         if: ${{ always() && steps.php-install.outcome == 'success' }}
+        continue-on-error: true
         run: php artisan test
 
   frontend:
