@@ -1,4 +1,4 @@
-name: CD (deployment scaffold)
+name: CD - Publish Docker Hub images
 
 on:
   workflow_run:
@@ -9,22 +9,84 @@ permissions:
   contents: read
 
 concurrency:
-  group: cd-production
+  group: cd-dockerhub-main
   cancel-in-progress: false
 
 jobs:
-  deployment-prerequisites:
-    name: Production deployment prerequisites
+  publish-images:
+    name: Publish application images to Docker Hub
     if: >-
-      vars.DEPLOY_ENABLED == 'true' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
-    timeout-minutes: 2
-    environment: production
+    timeout-minutes: 25
     steps:
-      - name: Stop until a real deployment target is configured
+      - name: Check out the exact commit tested by CI
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Validate Docker Hub credentials
+        id: dockerhub
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          echo "CD is a scaffold only: no hosting target, deployment adapter, health check, or rollback procedure is configured." >&2
-          echo "Do not set DEPLOY_ENABLED=true until these have been implemented and reviewed." >&2
-          exit 1
+          set -euo pipefail
+          username="$(printf '%s' "$DOCKERHUB_USERNAME" | tr -d '\r\n' | tr '[:upper:]' '[:lower:]')"
+          token="$(printf '%s' "$DOCKERHUB_TOKEN" | tr -d '\r\n')"
+
+          if [ -z "$username" ] || [ -z "$token" ]; then
+            echo "Configure the DOCKERHUB_USERNAME Actions variable and DOCKERHUB_TOKEN Actions secret." >&2
+            exit 1
+          fi
+          case "$username" in
+            *[!a-z0-9_-]*)
+              echo "DOCKERHUB_USERNAME must contain only Docker ID characters." >&2
+              exit 1
+              ;;
+          esac
+          if printf '%s' "$token" | grep -q '[[:space:]]'; then
+            echo "DOCKERHUB_TOKEN contains whitespace; replace it with the raw Docker Hub access token." >&2
+            exit 1
+          fi
+
+          echo "username=$username" >> "$GITHUB_OUTPUT"
+          unset token
+
+      - name: Log in to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ steps.dockerhub.outputs.username }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          token="$(printf '%s' "$DOCKERHUB_TOKEN" | tr -d '\r\n')"
+          printf '%s' "$token" | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
+          unset token DOCKERHUB_TOKEN
+
+      - name: Build and publish Laravel and Vite image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ steps.dockerhub.outputs.username }}/aquasecure-web:latest
+            ${{ steps.dockerhub.outputs.username }}/aquasecure-web:${{ github.event.workflow_run.head_sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      - name: Build and publish Flask classifier image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: AquaSecure_AI_Classification/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.dockerhub.outputs.username }}/aquasecure-classifier:latest
+            ${{ steps.dockerhub.outputs.username }}/aquasecure-classifier:${{ github.event.workflow_run.head_sha }}
+          cache-from: type=gha,scope=classifier
+          cache-to: type=gha,scope=classifier,mode=max
