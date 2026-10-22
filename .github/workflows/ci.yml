@@ -184,12 +184,45 @@ jobs:
           cache-from: type=gha,scope=classifier
           cache-to: type=gha,scope=classifier,mode=max
 
+  observability:
+    name: Prometheus and Grafana stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      APP_KEY: base64:MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=
+      GRAFANA_ADMIN_PASSWORD: ci-only-not-a-secret
+      AQUASECURE_HTTP_PORT: '18080'
+      PROMETHEUS_PORT: '19091'
+      GRAFANA_PORT: '13001'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate observability Compose configuration
+        run: docker compose --profile observability config --quiet
+
+      - name: Start application and observability stack
+        run: docker compose --profile observability up --build --detach --wait --wait-timeout 300
+
+      - name: Check Prometheus and Grafana health endpoints
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 30 --retry-delay 3 --retry-connrefused \
+            http://127.0.0.1:${PROMETHEUS_PORT}/-/ready
+          curl --fail --silent --show-error --retry 30 --retry-delay 3 --retry-connrefused \
+            http://127.0.0.1:${GRAFANA_PORT}/api/health
+
+      - name: Stop observability stack
+        if: ${{ always() }}
+        run: docker compose --profile observability down --volumes --remove-orphans
+
   sonarqube:
     name: SonarQube analysis
     if: >-
       vars.SONAR_HOST_URL != '' &&
-      !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
-    runs-on: ubuntu-latest
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request'
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 15
     steps:
       - name: Check out full history for analysis
@@ -198,13 +231,24 @@ jobs:
           fetch-depth: 0
 
       - name: Require SonarQube token
+        shell: powershell
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          if [ -z "$SONAR_TOKEN" ]; then
-            echo "SONAR_TOKEN is required when SONAR_HOST_URL is configured." >&2
-            exit 1
-          fi
+          if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
+            throw 'SONAR_TOKEN is required when SONAR_HOST_URL is configured.'
+          }
+
+      - name: Add GPG tools required to verify SonarScanner
+        shell: powershell
+        run: |
+          $gpgDirectory = Join-Path $env:ProgramFiles 'Git\usr\bin'
+          foreach ($tool in @('gpg.exe', 'dirmngr.exe')) {
+            if (-not (Test-Path (Join-Path $gpgDirectory $tool))) {
+              throw "Required SonarScanner signature tool is missing: $tool"
+            }
+          }
+          $gpgDirectory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Analyze with SonarQube
         uses: SonarSource/sonarqube-scan-action@v7
