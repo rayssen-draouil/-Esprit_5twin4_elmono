@@ -207,9 +207,9 @@ jobs:
       - name: Check Prometheus and Grafana health endpoints
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 30 --retry-delay 3 --retry-connrefused \
+          curl --fail --silent --show-error --retry 30 --retry-delay 3 --retry-all-errors \
             http://127.0.0.1:${PROMETHEUS_PORT}/-/ready
-          curl --fail --silent --show-error --retry 30 --retry-delay 3 --retry-connrefused \
+          curl --fail --silent --show-error --retry 30 --retry-delay 3 --retry-all-errors \
             http://127.0.0.1:${GRAFANA_PORT}/api/health
 
       - name: Stop observability stack
@@ -252,7 +252,7 @@ jobs:
           $gpgDirectory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Analyze with SonarQube
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
